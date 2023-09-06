@@ -1,0 +1,18 @@
+#Ignore everything
+*
+
+#but not this
+!*/
+!*.md
+!*.c
+!*.h
+!*.cpp
+!*.hpp
+!*.txt
+!.gitignore
+!makefile
+!*.sh
+!*.py
+
+build
+compile_flags.txt
