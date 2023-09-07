@@ -8,6 +8,9 @@
 typedef enum {
   /// Takes a single byte operand
   /// that specifies the index in Chunk's constants array to the constant value
+  ///
+  /// Interpreting: Pushes constant onto VM's stack.
+  /// 
   /// @size - 2 bytes
   OP_CONSTANT, 
 
@@ -15,10 +18,42 @@ typedef enum {
   /// that specifies the index in Chunk's constants array to the constant value
   ///
   /// opcode essentilly is the same as OP_CONSTANT, but allowed indexes greater than 255
+  ///
+  /// Interpreting: Pushes constant onto VM's stack.
+  ///
   /// @size - 4 bytes
   OP_CONSTANT_LONG,
 
-  /// Bare op code, takes no operands
+  /// Bare opcode, takes no operands
+  /// Interpreting: Negates top value of the VM's stack
+  /// @size - 1 byte
+  OP_NEGATE,
+
+  /// Bare opcode, takes no operands
+  /// Interpreting: Pops two values from the top of the VM's stack,
+  /// adds them, and pushes result back onto the stack
+  /// @size - 1 byte
+  OP_ADD,
+
+  /// Bare opcode, takes no operands
+  /// Interpreting: Pops two values from the top of the VM's stack,
+  /// substracts them, and pushes result back onto the stack
+  /// @size - 1 byte
+  OP_SUBSTRACT,
+
+  /// Bare opcode, takes no operands
+  /// Interpreting: Pops two values from the top of the VM's stack,
+  /// multiplies them, and pushes result back onto the stack
+  /// @size - 1 byte
+  OP_MULTIPLY,
+
+  /// Bare opcode, takes no operands
+  /// Interpreting: Pops two values from the top of the VM's stack,
+  /// divides them, and pushes result back onto the stack
+  /// @size - 1 byte
+  OP_DIVIDE,
+
+  /// Bare opcode, takes no operands
   /// @size - 1 byte
   OP_RETURN, 
 } OpCode;

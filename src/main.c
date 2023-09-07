@@ -11,13 +11,19 @@ int main(int argc, char *argv[])
   Chunk chunk;
   chunk_init(&chunk);
 
-  for (i32 i = 0; i < 266; ++i) {
-    chunk_write_constant(&chunk, i / 2.0, i + 1);
-  }
+  chunk_write_constant(&chunk, 1.2, 1);
+  chunk_write_constant(&chunk, 3.4, 1);
 
-  chunk_write(&chunk, OP_RETURN, 266);
+  chunk_write(&chunk, OP_ADD, 1);
 
-  chunk_disassemble(&chunk, "test chunk");
+  chunk_write_constant(&chunk, 2, 1);
+
+  chunk_write(&chunk, OP_DIVIDE, 1);
+  chunk_write(&chunk, OP_NEGATE, 1);
+
+  chunk_write(&chunk, OP_RETURN, 2);
+  
+  // chunk_disassemble(&chunk, "test chunk");
   vm_interpret(&chunk);
 
   vm_free();
