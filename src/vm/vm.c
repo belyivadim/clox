@@ -60,8 +60,8 @@ static InterpreterResult vm_run() {
 #define BINARY_OP(op) \
   do { \
     double b = vm_stack_pop(); \
-    double a = vm_stack_pop(); \
-    vm_stack_push(a op b); \
+    Value *pa = vm.stack_top - 1; \
+    *pa = *pa op b; \
   } while (0)
 
 #ifdef DEBUG_TRACE_EXECUTION
