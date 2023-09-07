@@ -2,6 +2,7 @@
 
 #include "vm.h"
 #include "vm/debug.h"
+#include "../frontend/compiler.h"
 
 /// virtual machine singleton
 Vm vm;
@@ -38,12 +39,14 @@ static void vm_stack_reset() {
   vm.stack_top = vm.stack;
 }
 
-InterpreterResult vm_interpret(Chunk *chunk) {
-  assert(NULL != chunk);
+InterpreterResult vm_interpret(const char *source) {
+  assert(NULL != source);
+  compile(source);
+  return INTERPRET_OK;
 
-  vm.chunk = chunk;
-  vm.ip = vm.chunk->code;
-  return vm_run();
+  // vm.chunk = chunk;
+  // vm.ip = vm.chunk->code;
+  // return vm_run();
 }
 
 

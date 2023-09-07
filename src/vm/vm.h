@@ -42,11 +42,11 @@ void vm_init();
 /// @return void
 void vm_free();
 
-/// Interprets chunk of the byte code
+/// Interprets source code of clox
 ///
-/// @param chunk pointer to the Chunk to be interpreted
+/// @param source pointer to the source code to be interpreted
 /// @return InterpreterResult, status code of interpretation
-InterpreterResult vm_interpret(Chunk *chunk);
+InterpreterResult vm_interpret(const char *source);
 
 /// Pushes a value to the VM's stack
 ///
