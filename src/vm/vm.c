@@ -41,12 +41,21 @@ static void vm_stack_reset() {
 
 InterpreterResult vm_interpret(const char *source) {
   assert(NULL != source);
-  compile(source);
-  return INTERPRET_OK;
 
-  // vm.chunk = chunk;
-  // vm.ip = vm.chunk->code;
-  // return vm_run();
+  Chunk chunk;
+  chunk_init(&chunk);
+
+  if (!compile(source, &chunk)) {
+    chunk_free(&chunk);
+    return INTERPRET_COMPILE_ERROR;
+  }
+
+  vm.chunk = &chunk;
+  vm.ip = vm.chunk->code;
+
+  InterpreterResult result = vm_run();
+
+  return result;
 }
 
 
