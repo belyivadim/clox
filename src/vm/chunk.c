@@ -26,7 +26,7 @@ void chunk_free(Chunk *chunk) {
   assert(NULL != chunk);
 
   FREE_ARRAY(u8, chunk->code, chunk->code_capacity);
-  FREE_ARRAY(i32, chunk->lines, chunk->code_capacity);
+  FREE_ARRAY(LineCodeIndexPair, chunk->lines, chunk->lines_capacity);
   value_array_free(&chunk->constants);
   chunk_init(chunk);
 }

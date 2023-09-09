@@ -1,7 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "common.h"
 #include "compiler.h"
+#include "frontend/token.h"
 #include "scanner.h"
 
 /// Represent the Token Parser
@@ -20,6 +22,37 @@ typedef struct {
   /// While parser is in the panic mode it does not report errors.
   bool panic_mode;
 } Parser;
+
+/// Represents the precedence of an expression
+typedef enum {
+  PREC_NONE,
+  PREC_ASSIGMENT,
+  PREC_OR,
+  PREC_AND,
+  PREC_EQUALITY,
+  PREC_COMPARISON,
+  PREC_TERM,          // + -
+  PREC_FACTOR,        // * /
+  PREC_UNARY,
+  PREC_CALL,          // . ()
+  PREC_PRIMARY
+} Precedence;
+
+/// Represents the type of a function for parse rules table
+typedef void (*ParseFn)();
+
+/// Represents the parse rule in parse table
+typedef struct {
+  /// The function for prefix expression
+  ParseFn prefix;
+
+  /// The function for infix expression
+  ParseFn infix;
+
+  /// The precedence of the rule
+  Precedence precedence;
+} ParseRule;
+
 
 /// Parser singleton
 Parser parser;
@@ -83,6 +116,91 @@ static void error_at(const Token *token, const char *message);
 /// @param message: a message that describes the error
 /// @return void
 static void error(const char *message);
+
+
+/// Handles number expression,
+/// requires parser's previous field to be of TOK_NUMBER kind
+///
+/// @return void
+static void number_handler();
+
+/// Handles grouping expression,
+/// requires parser's previous field to be of TOK_LEFT_PAREN kind
+///
+/// @return void
+static void grouping_handler();
+
+/// Handles unary expression,
+/// requires parser's previous field to be of TOK_MINUS or TOK_BANG kind
+///
+/// @return void
+static void unary_handler();
+
+/// Handles binary expression,
+/// requires parser's previous field to be of 
+/// TOK_MINUS, TOK_PLUS, TOK_SLASH or TOK_STAR kind
+///
+/// @return void
+static void binary_handler();
+
+
+/// Parses all the subsequent expression with the precedence
+/// equal or higher than precedence param
+///
+/// @param precedence: the minimum precedence of the expression to be parsed
+/// @return void
+static void parse_precedence(Precedence precedence);
+
+/// Getter for a rule from rules table
+///
+/// @param kind: kind of a token to get rule for
+/// @return ParseRule*, pointer to the ParseRule in rules table
+static ParseRule *get_rule(TokenKind kind);
+
+
+/// The table of parse rules
+ParseRule rules[] = {
+  [TOK_LEFT_PAREN]    = {grouping_handler, NULL, PREC_NONE},
+  [TOK_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
+  [TOK_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
+  [TOK_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
+  [TOK_COMMA]         = {NULL, NULL, PREC_NONE},
+  [TOK_DOT]           = {NULL, NULL, PREC_NONE},
+  [TOK_MINUS]         = {unary_handler, binary_handler, PREC_TERM},
+  [TOK_PLUS]          = {NULL, binary_handler, PREC_TERM},
+  [TOK_SEMICOLON]     = {NULL, NULL, PREC_NONE},
+  [TOK_SLASH]         = {NULL, binary_handler, PREC_FACTOR},
+  [TOK_STAR]          = {NULL, binary_handler, PREC_FACTOR},
+  [TOK_BANG]          = {NULL, NULL, PREC_NONE},
+  [TOK_BANG_EQUAL]    = {NULL, NULL, PREC_NONE},
+  [TOK_GREATER]       = {NULL, NULL, PREC_NONE},
+  [TOK_GREATER_EQUAL] = {NULL, NULL, PREC_NONE},
+  [TOK_LESS]          = {NULL, NULL, PREC_NONE},
+  [TOK_LESS_EQUAL]    = {NULL, NULL, PREC_NONE},
+  [TOK_IDENTIFIER]    = {NULL, NULL, PREC_NONE},
+  [TOK_STRING]        = {NULL, NULL, PREC_NONE},
+  [TOK_NUMBER]        = {number_handler, NULL, PREC_NONE},
+  [TOK_AND]           = {NULL, NULL, PREC_NONE},
+  [TOK_ELSE]          = {NULL, NULL, PREC_NONE},
+  [TOK_FALSE]         = {NULL, NULL, PREC_NONE},
+  [TOK_FOR]           = {NULL, NULL, PREC_NONE},
+  [TOK_FUN]           = {NULL, NULL, PREC_NONE},
+  [TOK_IF]            = {NULL, NULL, PREC_NONE},
+  [TOK_NIL]           = {NULL, NULL, PREC_NONE},
+  [TOK_OR]            = {NULL, NULL, PREC_NONE},
+  [TOK_PRINT]         = {NULL, NULL, PREC_NONE},
+  [TOK_RETURN]        = {NULL, NULL, PREC_NONE},
+  [TOK_SUPER]         = {NULL, NULL, PREC_NONE},
+  [TOK_THIS]          = {NULL, NULL, PREC_NONE},
+  [TOK_TRUE]          = {NULL, NULL, PREC_NONE},
+  [TOK_VAR]           = {NULL, NULL, PREC_NONE},
+  [TOK_WHILE]         = {NULL, NULL, PREC_NONE},
+  [TOK_ERROR]         = {NULL, NULL, PREC_NONE},
+  [TOK_EOF]           = {NULL, NULL, PREC_NONE},
+
+};
+
+
 
 
 bool compile(const char *source, Chunk *chunk) {
@@ -166,5 +284,83 @@ static void emit_return() {
 }
 
 static void expression() {
+  parse_precedence(PREC_ASSIGMENT);
+}
 
+
+static void number_handler() {
+  assert(TOK_NUMBER == parser.previous.kind);
+  double value = strtod(parser.previous.start, NULL);
+  chunk_write_constant(current_chunk(), value, parser.previous.line);
+}
+
+static void grouping_handler() {
+  assert(TOK_LEFT_PAREN == parser.previous.kind);
+  expression();
+  consume(TOK_RIGHT_PAREN, "Expect ')' after expression.");
+}
+
+static void unary_handler() {
+  TokenKind operator_kind = parser.previous.kind;
+
+  assert(TOK_MINUS == operator_kind || TOK_BANG == operator_kind);
+
+  // compile the operand
+  parse_precedence(PREC_UNARY);
+
+  switch (operator_kind) {
+    case TOK_MINUS: emit_byte(OP_NEGATE); break;
+    case TOK_BANG: break;
+
+    default:
+      return; // unreachable
+  }
+}
+
+static void binary_handler() {
+  TokenKind operator_kind = parser.previous.kind;
+
+  assert(operator_kind == TOK_MINUS || operator_kind == TOK_PLUS
+         || operator_kind == TOK_SLASH || operator_kind == TOK_STAR);
+
+  // compile the right operand
+  ParseRule *rule = get_rule(operator_kind);
+  // +1 because all of supported binary operators are right associative,
+  // so we should not capture expression with the same precedence
+  // to the right operand
+  parse_precedence((Precedence)(rule->precedence + 1));
+
+  switch (operator_kind) {
+    case TOK_PLUS:    emit_byte(OP_ADD); break;
+    case TOK_MINUS:    emit_byte(OP_SUBSTRACT); break;
+    case TOK_STAR:    emit_byte(OP_MULTIPLY); break;
+    case TOK_SLASH:    emit_byte(OP_DIVIDE); break;
+
+    default:
+      return; // unreachable
+  }
+}
+
+
+static void parse_precedence(Precedence precedence) {
+  advance();
+  ParseFn prefix_rule = get_rule(parser.previous.kind)->prefix;
+
+  if (NULL == prefix_rule) {
+    error("Expect expression.");
+    return;
+  }
+
+  prefix_rule();
+
+  while (precedence <= get_rule(parser.current.kind)->precedence) {
+    advance();
+    ParseFn infix_rule = get_rule(parser.previous.kind)->infix;
+    assert(NULL != infix_rule);
+    infix_rule();
+  }
+}
+
+static ParseRule *get_rule(TokenKind kind) {
+  return &rules[kind];
 }

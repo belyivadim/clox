@@ -55,6 +55,8 @@ InterpreterResult vm_interpret(const char *source) {
 
   InterpreterResult result = vm_run();
 
+  chunk_free(&chunk);
+
   return result;
 }
 
