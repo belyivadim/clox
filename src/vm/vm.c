@@ -21,6 +21,8 @@ static const Value* vm_stack_peek(i32 distance);
 /// @return Value*, pointer to peeked Value
 static Value* vm_stack_top();
 
+static bool is_falsey(Value value);
+
 /// Reports runtime error to stderr with formated message
 static void runtime_error(const char *format, ...);
 
@@ -64,6 +66,12 @@ static void vm_stack_reset() {
   vm.stack_top = vm.stack;
 }
 
+static bool is_falsey(Value value) {
+  return IS_NIL(value) 
+      || (IS_BOOL(value) && !AS_BOOL(value))
+      || (IS_NUMBER(value) && (AS_NUMBER(value)) == 0);
+}
+
 InterpreterResult vm_interpret(const char *source) {
   assert(NULL != source);
 
@@ -96,15 +104,15 @@ static InterpreterResult vm_run() {
   ])
 #define SKIP_BYTES(n) (vm.ip += (n))
 
-#define BINARY_OP(op) \
+#define BINARY_OP(value_kind, op) \
   do { \
     if (!IS_NUMBER(*vm_stack_peek(0)) || !IS_NUMBER(*vm_stack_peek(1))) {\
       runtime_error("Operands must be a numbers.");\
       return INTERPRETER_RUNTUME_ERROR;\
     } \
-    double b = AS_NUMBER(vm_stack_pop()); \
-    Value *pa = vm_stack_top(); \
-    pa->as.number = pa->as.number op b; \
+    double rhs = AS_NUMBER(vm_stack_pop()); \
+    Value *plhs = vm_stack_top(); \
+    *plhs = value_kind(AS_NUMBER(*plhs) op rhs); \
   } while (0)
 
 #ifdef DEBUG_TRACE_EXECUTION
@@ -142,10 +150,31 @@ static InterpreterResult vm_run() {
       case OP_TRUE: vm_stack_push(BOOL_VAL(true)); break;
       case OP_FALSE: vm_stack_push(BOOL_VAL(false)); break;
 
-      case OP_ADD:        BINARY_OP(+); break;
-      case OP_SUBSTRACT:  BINARY_OP(-); break;
-      case OP_MULTIPLY:   BINARY_OP(*); break;
-      case OP_DIVIDE:     BINARY_OP(/); break;
+      case OP_ADD:        BINARY_OP(NUMBER_VAL, +); break;
+      case OP_SUBSTRACT:  BINARY_OP(NUMBER_VAL, -); break;
+      case OP_MULTIPLY:   BINARY_OP(NUMBER_VAL, *); break;
+      case OP_DIVIDE:     BINARY_OP(NUMBER_VAL, /); break;
+      
+      case OP_NOT:
+        *vm_stack_top() = BOOL_VAL(is_falsey(*vm_stack_top()));
+        break;
+
+      case OP_EQUAL: {
+        Value rhs = vm_stack_pop();
+        *vm_stack_top() = BOOL_VAL(values_equal(*vm_stack_top(), rhs));
+        break;
+      }
+
+      case OP_NOT_EQUAL: {
+        Value rhs = vm_stack_pop();
+        *vm_stack_top() = BOOL_VAL(!values_equal(*vm_stack_top(), rhs));
+        break;
+      }
+
+      case OP_GREATER:       BINARY_OP(BOOL_VAL, >); break;
+      case OP_GREATER_EQUAL: BINARY_OP(BOOL_VAL, >=); break;
+      case OP_LESS:          BINARY_OP(BOOL_VAL, <); break;
+      case OP_LESS_EQUAL:    BINARY_OP(BOOL_VAL, <=); break;
 
       case OP_NEGATE: {
         if (!(IS_NUMBER(*vm_stack_peek(0)))) {

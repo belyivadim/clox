@@ -39,6 +39,23 @@ typedef enum {
   /// @size - 1 byte
   OP_FALSE,
 
+
+  /// Bare opcodes, take no operands
+  /// Interpreting: Pops two values from the top of the VM's stack,
+  /// perform comparison, and push result back onto the stack as bool
+  /// @size - 1 byte
+  OP_EQUAL,
+  OP_NOT_EQUAL,
+  OP_GREATER,
+  OP_GREATER_EQUAL,
+  OP_LESS,
+  OP_LESS_EQUAL,
+
+  /// Bare opcode, takes no operands
+  /// Interpreting: Converts a value to boolean and applies not to it
+  /// @size - 1 byte
+  OP_NOT,
+
   /// Bare opcode, takes no operands
   /// Interpreting: Negates top value of the VM's stack
   /// @size - 1 byte

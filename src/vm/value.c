@@ -39,3 +39,16 @@ void value_print(Value value) {
     case VAL_NUMBER: printf("%g", AS_NUMBER(value)); break;
   }
 }
+
+bool values_equal(Value lhs, Value rhs) {
+  if (lhs.kind != rhs.kind) return false;
+
+  switch (lhs.kind) {
+    case VAL_BOOL: return AS_BOOL(lhs) == AS_BOOL(rhs);
+    case VAL_NIL: return true;
+    case VAL_NUMBER: return AS_NUMBER(lhs) == AS_NUMBER(rhs);
+
+    default:
+      return false; // unreachable
+  }
+}

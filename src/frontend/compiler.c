@@ -5,6 +5,7 @@
 #include "compiler.h"
 #include "frontend/token.h"
 #include "scanner.h"
+#include "vm/chunk.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "../vm/debug.h"
@@ -182,12 +183,13 @@ ParseRule rules[] = {
   [TOK_SEMICOLON]     = {NULL, NULL, PREC_NONE},
   [TOK_SLASH]         = {NULL, binary_handler, PREC_FACTOR},
   [TOK_STAR]          = {NULL, binary_handler, PREC_FACTOR},
-  [TOK_BANG]          = {NULL, NULL, PREC_NONE},
-  [TOK_BANG_EQUAL]    = {NULL, NULL, PREC_NONE},
-  [TOK_GREATER]       = {NULL, NULL, PREC_NONE},
-  [TOK_GREATER_EQUAL] = {NULL, NULL, PREC_NONE},
-  [TOK_LESS]          = {NULL, NULL, PREC_NONE},
-  [TOK_LESS_EQUAL]    = {NULL, NULL, PREC_NONE},
+  [TOK_BANG]          = {unary_handler, NULL, PREC_NONE},
+  [TOK_BANG_EQUAL]    = {NULL, binary_handler, PREC_EQUALITY},
+  [TOK_EQUAL_EQUAL]   = {NULL, binary_handler, PREC_EQUALITY},
+  [TOK_GREATER]       = {NULL, binary_handler, PREC_COMPARISON},
+  [TOK_GREATER_EQUAL] = {NULL, binary_handler, PREC_COMPARISON},
+  [TOK_LESS]          = {NULL, binary_handler, PREC_COMPARISON},
+  [TOK_LESS_EQUAL]    = {NULL, binary_handler, PREC_COMPARISON},
   [TOK_IDENTIFIER]    = {NULL, NULL, PREC_NONE},
   [TOK_STRING]        = {NULL, NULL, PREC_NONE},
   [TOK_NUMBER]        = {number_handler, NULL, PREC_NONE},
@@ -326,7 +328,7 @@ static void unary_handler() {
 
   switch (operator_kind) {
     case TOK_MINUS: emit_byte(OP_NEGATE); break;
-    case TOK_BANG: break;
+    case TOK_BANG: emit_byte(OP_NOT); break;
 
     default:
       return; // unreachable
@@ -336,9 +338,6 @@ static void unary_handler() {
 static void binary_handler() {
   TokenKind operator_kind = parser.previous.kind;
 
-  assert(operator_kind == TOK_MINUS || operator_kind == TOK_PLUS
-         || operator_kind == TOK_SLASH || operator_kind == TOK_STAR);
-
   // compile the right operand
   ParseRule *rule = get_rule(operator_kind);
   // +1 because all of supported binary operators are right associative,
@@ -347,12 +346,20 @@ static void binary_handler() {
   parse_precedence((Precedence)(rule->precedence + 1));
 
   switch (operator_kind) {
-    case TOK_PLUS:    emit_byte(OP_ADD); break;
-    case TOK_MINUS:    emit_byte(OP_SUBSTRACT); break;
-    case TOK_STAR:    emit_byte(OP_MULTIPLY); break;
-    case TOK_SLASH:    emit_byte(OP_DIVIDE); break;
+    case TOK_PLUS:          emit_byte(OP_ADD); break;
+    case TOK_MINUS:         emit_byte(OP_SUBSTRACT); break;
+    case TOK_STAR:          emit_byte(OP_MULTIPLY); break;
+    case TOK_SLASH:         emit_byte(OP_DIVIDE); break;
+
+    case TOK_BANG_EQUAL:    emit_byte(OP_NOT_EQUAL); break;
+    case TOK_EQUAL_EQUAL:   emit_byte(OP_EQUAL); break;
+    case TOK_GREATER:       emit_byte(OP_GREATER); break;
+    case TOK_GREATER_EQUAL: emit_byte(OP_GREATER_EQUAL); break;
+    case TOK_LESS:          emit_byte(OP_LESS); break;
+    case TOK_LESS_EQUAL:    emit_byte(OP_LESS_EQUAL); break;
 
     default:
+      assert(false && "Wrong operator kind.");
       return; // unreachable
   }
 }

@@ -68,5 +68,11 @@ void value_array_write(ValueArray *arr, Value value);
 /// @return void
 void value_print(Value value);
 
+/// Compares two values.
+/// Values are not equal if they are of different kind.
+///
+/// @params lhs, rhs: values to compare
+/// @return bool
+bool values_equal(Value lhs, Value rhs);
 
 #endif // !__CLOX_VALUE_H__
