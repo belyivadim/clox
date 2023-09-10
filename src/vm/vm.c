@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdio.h>
 
 #include "vm.h"
@@ -8,6 +9,21 @@
 Vm vm;
 
 static void vm_stack_reset();
+
+/// Peeks the value on the stack at the position number_of_elements - distance 
+///
+/// @param distance: distance to the element from the top of the stack
+/// @return const Value*, constant pointer to peeked Value
+static const Value* vm_stack_peek(i32 distance);
+
+/// Peeks the value on the top of the stack 
+///
+/// @return Value*, pointer to peeked Value
+static Value* vm_stack_top();
+
+/// Reports runtime error to stderr with formated message
+static void runtime_error(const char *format, ...);
+
 static InterpreterResult vm_run();
 static void vm_process_constant(Value constant);
 static void vm_process_return();
@@ -34,6 +50,15 @@ Value vm_stack_pop() {
   return *vm.stack_top;
 }
 
+static const Value* vm_stack_peek(i32 distance) {
+  assert(vm.stack_top - 1 - distance >= vm.stack);
+  return vm.stack_top - 1 - distance;
+}
+
+static Value* vm_stack_top() {
+  assert(vm.stack_top - 1 >= vm.stack);
+  return vm.stack_top - 1;
+}
 
 static void vm_stack_reset() {
   vm.stack_top = vm.stack;
@@ -73,9 +98,13 @@ static InterpreterResult vm_run() {
 
 #define BINARY_OP(op) \
   do { \
-    double b = vm_stack_pop(); \
-    Value *pa = vm.stack_top - 1; \
-    *pa = *pa op b; \
+    if (!IS_NUMBER(*vm_stack_peek(0)) || !IS_NUMBER(*vm_stack_peek(1))) {\
+      runtime_error("Operands must be a numbers.");\
+      return INTERPRETER_RUNTUME_ERROR;\
+    } \
+    double b = AS_NUMBER(vm_stack_pop()); \
+    Value *pa = vm_stack_top(); \
+    pa->as.number = pa->as.number op b; \
   } while (0)
 
 #ifdef DEBUG_TRACE_EXECUTION
@@ -109,13 +138,21 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_NIL: vm_stack_push(NIL_VAL); break;
+      case OP_TRUE: vm_stack_push(BOOL_VAL(true)); break;
+      case OP_FALSE: vm_stack_push(BOOL_VAL(false)); break;
+
       case OP_ADD:        BINARY_OP(+); break;
       case OP_SUBSTRACT:  BINARY_OP(-); break;
       case OP_MULTIPLY:   BINARY_OP(*); break;
       case OP_DIVIDE:     BINARY_OP(/); break;
 
       case OP_NEGATE: {
-        *(vm.stack_top - 1) = -*(vm.stack_top - 1);
+        if (!(IS_NUMBER(*vm_stack_peek(0)))) {
+          runtime_error("Operand must be a number.");
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        vm_stack_top()->as.number = -AS_NUMBER(*vm_stack_top());
         break;
       }
       case OP_RETURN:
@@ -141,4 +178,20 @@ static void vm_process_constant(Value constant) {
 static void vm_process_return() {
   value_print(vm_stack_pop());
   puts("");
+}
+
+
+static void runtime_error(const char *format, ...) {
+  va_list args;
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
+  fputs("\n", stderr);
+  
+  i32 instruction = vm.ip - vm.chunk->code - 1;
+  i32 line = chunk_get_line(vm.chunk, instruction);
+
+  fprintf(stderr, "[line %d] in script\n", line);
+
+  vm_stack_reset();
 }

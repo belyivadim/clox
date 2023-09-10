@@ -25,6 +25,21 @@ typedef enum {
   OP_CONSTANT_LONG,
 
   /// Bare opcode, takes no operands
+  /// Interpreting: Represents a nil value
+  /// @size - 1 byte
+  OP_NIL,
+
+  /// Bare opcode, takes no operands
+  /// Interpreting: Represents a boolean true value
+  /// @size - 1 byte
+  OP_TRUE,
+
+  /// Bare opcode, takes no operands
+  /// Interpreting: Represents a boolean false value
+  /// @size - 1 byte
+  OP_FALSE,
+
+  /// Bare opcode, takes no operands
   /// Interpreting: Negates top value of the VM's stack
   /// @size - 1 byte
   OP_NEGATE,

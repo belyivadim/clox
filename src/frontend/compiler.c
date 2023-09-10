@@ -6,6 +6,10 @@
 #include "frontend/token.h"
 #include "scanner.h"
 
+#ifdef DEBUG_PRINT_CODE
+#include "../vm/debug.h"
+#endif // !DEBUG_PRINT_CODE
+
 /// Represent the Token Parser
 typedef struct {
   /// Represent the current Token the Parser is parsing at the moment
@@ -143,6 +147,13 @@ static void unary_handler();
 /// @return void
 static void binary_handler();
 
+/// Handles literal expression,
+/// requires parser's previous field to be of 
+/// TOK_FALSE, TOK_TRUE, or TOK_NIL kind
+///
+/// @return void
+static void literal_hanler();
+
 
 /// Parses all the subsequent expression with the precedence
 /// equal or higher than precedence param
@@ -182,17 +193,17 @@ ParseRule rules[] = {
   [TOK_NUMBER]        = {number_handler, NULL, PREC_NONE},
   [TOK_AND]           = {NULL, NULL, PREC_NONE},
   [TOK_ELSE]          = {NULL, NULL, PREC_NONE},
-  [TOK_FALSE]         = {NULL, NULL, PREC_NONE},
+  [TOK_FALSE]         = {literal_hanler, NULL, PREC_NONE},
   [TOK_FOR]           = {NULL, NULL, PREC_NONE},
   [TOK_FUN]           = {NULL, NULL, PREC_NONE},
   [TOK_IF]            = {NULL, NULL, PREC_NONE},
-  [TOK_NIL]           = {NULL, NULL, PREC_NONE},
+  [TOK_NIL]           = {literal_hanler, NULL, PREC_NONE},
   [TOK_OR]            = {NULL, NULL, PREC_NONE},
   [TOK_PRINT]         = {NULL, NULL, PREC_NONE},
   [TOK_RETURN]        = {NULL, NULL, PREC_NONE},
   [TOK_SUPER]         = {NULL, NULL, PREC_NONE},
   [TOK_THIS]          = {NULL, NULL, PREC_NONE},
-  [TOK_TRUE]          = {NULL, NULL, PREC_NONE},
+  [TOK_TRUE]          = {literal_hanler, NULL, PREC_NONE},
   [TOK_VAR]           = {NULL, NULL, PREC_NONE},
   [TOK_WHILE]         = {NULL, NULL, PREC_NONE},
   [TOK_ERROR]         = {NULL, NULL, PREC_NONE},
@@ -273,6 +284,11 @@ static void consume(TokenKind kind, const char *message) {
 
 static void end_compiler() {
   emit_return();
+#ifdef DEBUG_PRINT_CODE
+  if (!parser.had_error) {
+    chunk_disassemble(current_chunk(), "code");
+  }
+#endif // !DEBUG_PRINT_CODE
 }
 
 static void emit_byte(u8 byte) {
@@ -291,7 +307,7 @@ static void expression() {
 static void number_handler() {
   assert(TOK_NUMBER == parser.previous.kind);
   double value = strtod(parser.previous.start, NULL);
-  chunk_write_constant(current_chunk(), value, parser.previous.line);
+  chunk_write_constant(current_chunk(), NUMBER_VAL(value), parser.previous.line);
 }
 
 static void grouping_handler() {
@@ -335,6 +351,20 @@ static void binary_handler() {
     case TOK_MINUS:    emit_byte(OP_SUBSTRACT); break;
     case TOK_STAR:    emit_byte(OP_MULTIPLY); break;
     case TOK_SLASH:    emit_byte(OP_DIVIDE); break;
+
+    default:
+      return; // unreachable
+  }
+}
+
+static void literal_hanler() {
+  TokenKind kind = parser.previous.kind;
+  assert(TOK_NIL == kind || TOK_FALSE == kind || TOK_TRUE == kind);
+
+  switch (kind) {
+    case TOK_FALSE: emit_byte(OP_FALSE); break;
+    case TOK_NIL: emit_byte(OP_NIL); break;
+    case TOK_TRUE: emit_byte(OP_TRUE); break;
 
     default:
       return; // unreachable
