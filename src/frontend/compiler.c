@@ -6,6 +6,7 @@
 #include "frontend/token.h"
 #include "scanner.h"
 #include "vm/chunk.h"
+#include "../vm/object.h"
 
 #ifdef DEBUG_PRINT_CODE
 #include "../vm/debug.h"
@@ -89,6 +90,12 @@ static void emit_byte(u8 byte);
 /// @return void
 static void emit_return();
 
+/// Emits the constant value to the ValueArray of the currently compiled chunk
+///
+/// @param value: value to emit
+/// @return void
+static void emit_constant(Value value);
+
 /// Checks if the current token is of kind param,
 /// if it is then advances the parser,
 /// otherwise reports an error at the current token with the message param
@@ -155,6 +162,12 @@ static void binary_handler();
 /// @return void
 static void literal_hanler();
 
+/// Handles string expression,
+/// requires parser's previous field to be of 
+/// TOK_STRING kind
+///
+/// @return void
+static void string_handler();
 
 /// Parses all the subsequent expression with the precedence
 /// equal or higher than precedence param
@@ -191,7 +204,7 @@ ParseRule rules[] = {
   [TOK_LESS]          = {NULL, binary_handler, PREC_COMPARISON},
   [TOK_LESS_EQUAL]    = {NULL, binary_handler, PREC_COMPARISON},
   [TOK_IDENTIFIER]    = {NULL, NULL, PREC_NONE},
-  [TOK_STRING]        = {NULL, NULL, PREC_NONE},
+  [TOK_STRING]        = {string_handler, NULL, PREC_NONE},
   [TOK_NUMBER]        = {number_handler, NULL, PREC_NONE},
   [TOK_AND]           = {NULL, NULL, PREC_NONE},
   [TOK_ELSE]          = {NULL, NULL, PREC_NONE},
@@ -301,6 +314,10 @@ static void emit_return() {
   emit_byte(OP_RETURN);
 }
 
+static void emit_constant(Value value) {
+  chunk_write_constant(current_chunk(), value, parser.previous.line);
+}
+
 static void expression() {
   parse_precedence(PREC_ASSIGMENT);
 }
@@ -309,7 +326,7 @@ static void expression() {
 static void number_handler() {
   assert(TOK_NUMBER == parser.previous.kind);
   double value = strtod(parser.previous.start, NULL);
-  chunk_write_constant(current_chunk(), NUMBER_VAL(value), parser.previous.line);
+  emit_constant(NUMBER_VAL(value));
 }
 
 static void grouping_handler() {
@@ -378,6 +395,11 @@ static void literal_hanler() {
   }
 }
 
+static void string_handler() {
+  // emits string literal with trimed quotes
+  emit_constant(OBJ_VAL(string_copy(parser.previous.start + 1,
+                                    parser.previous.length - 2)));
+}
 
 static void parse_precedence(Precedence precedence) {
   advance();

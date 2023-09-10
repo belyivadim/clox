@@ -3,11 +3,20 @@
 
 #include "common.h"
 
+/// Forward declaration for struct that represents heap allocated objects.
+/// Definition is located in "vm/object.h" file.
+typedef struct Obj Obj;
+
+/// Forward declaration for struct that represents clox string object.
+/// Definition is located in "vm/object.h" file.
+typedef struct ObjString ObjString;
+
 /// Represents all kind of values supported by VM
 typedef enum {
   VAL_BOOL,
   VAL_NIL,
-  VAL_NUMBER
+  VAL_NUMBER,
+  VAL_OBJ
 } ValueKind;
 
 /// Represents a value in VM
@@ -16,6 +25,7 @@ typedef struct {
   union {
     bool boolean;
     double number;
+    Obj *pobj;
   } as;
 
   /// Kind of the currently stored value
@@ -23,18 +33,21 @@ typedef struct {
 } Value;
 
 /// Macros to initialize/assign Value
-#define BOOL_VAL(v)       ((Value){.as = {.boolean = v}, .kind = VAL_BOOL})
+#define BOOL_VAL(b)       ((Value){.as = {.boolean = b}, .kind = VAL_BOOL})
 #define NIL_VAL           ((Value){.as = {.number = 0}, .kind = VAL_NIL})
-#define NUMBER_VAL(v)     ((Value){.as = {.number = v}, .kind = VAL_NUMBER})
+#define NUMBER_VAL(n)     ((Value){.as = {.number = n}, .kind = VAL_NUMBER})
+#define OBJ_VAL(po)        ((Value){.as = {.pobj = (Obj*)po}, .kind = VAL_OBJ})
 
 /// Macros to access Value
 #define AS_BOOL(v)        ((v).as.boolean)
 #define AS_NUMBER(v)      ((v).as.number)
+#define AS_OBJ(v)         ((v).as.pobj)
 
 /// Macros to identify Value
 #define IS_BOOL(v)        (VAL_BOOL == (v).kind)
 #define IS_NIL(v)         (VAL_NIL == (v).kind)
 #define IS_NUMBER(v)      (VAL_NUMBER == (v).kind)
+#define IS_OBJ(v)         (VAL_OBJ == (v).kind)
 
 /// Represents a dynamic array of the VM's values
 typedef struct {

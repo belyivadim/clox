@@ -23,6 +23,9 @@ enum {
 #define FREE_ARRAY(T, ptr, old_count) \
   reallocate(ptr, sizeof(T) * old_count, 0)
 
+#define ALLOCATE(T, count) \
+  (T*)reallocate(NULL, 0, sizeof(T) * (count))
+
 /// Realocates the memory at ptr with new_size
 /// if realocation failed, terminates the process with exit code 1
 /// if new_size is 0, frees the memory pointed by ptr
