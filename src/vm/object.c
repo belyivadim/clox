@@ -32,6 +32,9 @@ ObjString *string_copy(const char *chars, u32 length) {
   return string_allocate(heap_chars, length);
 }
 
+ObjString *string_create(char *chars, u32 length) {
+  return string_allocate(chars, length);
+}
 
 static ObjString *string_allocate(char *chars, u32 length) {
   ObjString* str = ALLOCATE_OBJ(ObjString, OBJ_STRING);

@@ -1,9 +1,12 @@
 #include <stdarg.h>
 #include <stdio.h>
+#include <memory.h>
 
 #include "vm.h"
 #include "vm/debug.h"
 #include "../frontend/compiler.h"
+#include "../utils/memory.h"
+#include "object.h"
 
 /// virtual machine singleton
 Vm vm;
@@ -21,10 +24,22 @@ static const Value* vm_stack_peek(i32 distance);
 /// @return Value*, pointer to peeked Value
 static Value* vm_stack_top();
 
+/// Checks if passed value is falsey.
+/// if value is nil, false or number 0, it is falsey,
+///
+/// @param value: value to be checked
+/// return bool
 static bool is_falsey(Value value);
 
 /// Reports runtime error to stderr with formated message
 static void runtime_error(const char *format, ...);
+
+/// Concatenates two strings on top of the stack,
+/// pops string that are to be concatenated from the stack,
+/// pushes new concatenated string onto the stack
+///
+/// @return void
+static void concatenate();
 
 static InterpreterResult vm_run();
 static void vm_process_constant(Value constant);
@@ -70,6 +85,20 @@ static bool is_falsey(Value value) {
   return IS_NIL(value) 
       || (IS_BOOL(value) && !AS_BOOL(value))
       || (IS_NUMBER(value) && (AS_NUMBER(value)) == 0);
+}
+
+static void concatenate() {
+  ObjString *rhs = AS_STRING(vm_stack_pop());
+  ObjString *lhs = AS_STRING(vm_stack_pop());
+
+  u32 length = lhs->length + rhs->length;
+  char *chars = ALLOCATE(char, length + 1);
+  memcpy(chars, lhs->chars, lhs->length);
+  memcpy(chars + lhs->length, rhs->chars, rhs->length);
+  chars[length] = '\0';
+
+  ObjString * result = string_create(chars, length);
+  vm_stack_push(OBJ_VAL(result));
 }
 
 InterpreterResult vm_interpret(const char *source) {
@@ -150,7 +179,19 @@ static InterpreterResult vm_run() {
       case OP_TRUE: vm_stack_push(BOOL_VAL(true)); break;
       case OP_FALSE: vm_stack_push(BOOL_VAL(false)); break;
 
-      case OP_ADD:        BINARY_OP(NUMBER_VAL, +); break;
+      case OP_ADD: {
+        if (IS_STRING(*vm_stack_peek(0)) && IS_STRING(*vm_stack_peek(1))) {
+          concatenate();
+        } else if (IS_NUMBER(*vm_stack_peek(0)) && IS_NUMBER(*vm_stack_peek(1))) {
+          double rhs = AS_NUMBER(vm_stack_pop()); 
+          Value *plhs = vm_stack_top(); 
+          *plhs = NUMBER_VAL(AS_NUMBER(*plhs) + rhs); 
+        } else {
+          runtime_error("Operands must be two numbers or two strings.");
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        break;
+      }
       case OP_SUBSTRACT:  BINARY_OP(NUMBER_VAL, -); break;
       case OP_MULTIPLY:   BINARY_OP(NUMBER_VAL, *); break;
       case OP_DIVIDE:     BINARY_OP(NUMBER_VAL, /); break;
