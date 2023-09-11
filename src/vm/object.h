@@ -25,6 +25,9 @@ typedef enum {
 struct Obj {
   /// Tag for kind of the object
   ObjKind kind;
+
+  /// Pointer to the next heap allocated object
+  struct Obj *next;
 };
 
 /// Represents clox string object

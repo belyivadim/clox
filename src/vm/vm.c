@@ -8,9 +8,6 @@
 #include "../utils/memory.h"
 #include "object.h"
 
-/// virtual machine singleton
-Vm vm;
-
 static void vm_stack_reset();
 
 /// Peeks the value on the stack at the position number_of_elements - distance 
@@ -45,40 +42,51 @@ static InterpreterResult vm_run();
 static void vm_process_constant(Value constant);
 static void vm_process_return();
 
+Vm* vm_instance() {
+  static Vm vm;
+  return &vm;
+}
 
 void vm_init() {
   vm_stack_reset();
+  vm_instance()->objects = NULL;
 }
 
 void vm_free() {
+  free_objects();
 }
 
 void vm_stack_push(Value value) {
-  assert(vm.stack_top - vm.stack < STACK_MAX);
+  Vm *vm = vm_instance();
+  assert(vm->stack_top - vm->stack < STACK_MAX);
 
-  *vm.stack_top = value;
-  ++vm.stack_top;
+  *vm->stack_top = value;
+  ++vm->stack_top;
 }
 
 Value vm_stack_pop() {
-  assert(vm.stack_top > vm.stack);
+  Vm *vm = vm_instance();
+  assert(vm->stack_top > vm->stack);
 
-  --vm.stack_top;
-  return *vm.stack_top;
+  --vm->stack_top;
+  return *vm->stack_top;
 }
 
 static const Value* vm_stack_peek(i32 distance) {
-  assert(vm.stack_top - 1 - distance >= vm.stack);
-  return vm.stack_top - 1 - distance;
+  Vm *vm = vm_instance();
+  assert(vm->stack_top - 1 - distance >= vm->stack);
+  return vm->stack_top - 1 - distance;
 }
 
 static Value* vm_stack_top() {
-  assert(vm.stack_top - 1 >= vm.stack);
-  return vm.stack_top - 1;
+  Vm *vm = vm_instance();
+  assert(vm->stack_top - 1 >= vm->stack);
+  return vm->stack_top - 1;
 }
 
 static void vm_stack_reset() {
-  vm.stack_top = vm.stack;
+  Vm *vm = vm_instance();
+  vm->stack_top = vm->stack;
 }
 
 static bool is_falsey(Value value) {
@@ -112,8 +120,9 @@ InterpreterResult vm_interpret(const char *source) {
     return INTERPRET_COMPILE_ERROR;
   }
 
-  vm.chunk = &chunk;
-  vm.ip = vm.chunk->code;
+  Vm *vm = vm_instance();
+  vm->chunk = &chunk;
+  vm->ip = vm->chunk->code;
 
   InterpreterResult result = vm_run();
 
@@ -124,14 +133,14 @@ InterpreterResult vm_interpret(const char *source) {
 
 
 static InterpreterResult vm_run() {
-#define OFFSET() (vm.ip - vm.chunk->code)
-#define READ_BYTE() (*vm.ip++)
-#define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+#define OFFSET() (vm->ip - vm->chunk->code)
+#define READ_BYTE() (*vm->ip++)
+#define READ_CONSTANT() (vm->chunk->constants.values[READ_BYTE()])
 #define READ_CONSTANT_LONG() \
-  (vm.chunk->constants.values[\
-    chunk_get_constant_long_index(vm.chunk, OFFSET())\
+  (vm->chunk->constants.values[\
+    chunk_get_constant_long_index(vm->chunk, OFFSET())\
   ])
-#define SKIP_BYTES(n) (vm.ip += (n))
+#define SKIP_BYTES(n) (vm->ip += (n))
 
 #define BINARY_OP(value_kind, op) \
   do { \
@@ -148,19 +157,20 @@ static InterpreterResult vm_run() {
 #define PRINT_DEBUG_INFO() \
   do { \
     printf("          "); \
-    for (Value *slot = vm.stack; slot < vm.stack_top; ++slot) { \
+    for (Value *slot = vm->stack; slot < vm->stack_top; ++slot) { \
       printf("( "); \
       value_print(*slot); \
       printf(" )"); \
     } \
     puts(""); \
-    chunk_disassemble_instruction(vm.chunk, OFFSET()); \
+    chunk_disassemble_instruction(vm->chunk, OFFSET()); \
   } while (0)
 #else
 #define PRINT_DEBUG_INFO() (void)0
 #endif /* !DEBUG_TRACE_EXECUTION */
 
   // function body starts here
+  Vm *vm = vm_instance();
   for (;;) {
     PRINT_DEBUG_INFO();
     u8 instruction;
@@ -258,8 +268,9 @@ static void runtime_error(const char *format, ...) {
   va_end(args);
   fputs("\n", stderr);
   
-  i32 instruction = vm.ip - vm.chunk->code - 1;
-  i32 line = chunk_get_line(vm.chunk, instruction);
+  Vm *vm = vm_instance();
+  i32 instruction = vm->ip - vm->chunk->code - 1;
+  i32 line = chunk_get_line(vm->chunk, instruction);
 
   fprintf(stderr, "[line %d] in script\n", line);
 

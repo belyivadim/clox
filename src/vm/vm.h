@@ -23,6 +23,9 @@ typedef struct {
   /// it points to the slot where next value will be pushed,
   /// and not actual top value of the stack
   Value *stack_top;
+
+  // Pointer to the head of the list of heap allocated objects
+  Obj *objects;
 } Vm;
 
 /// Represents status codes of interpretation
@@ -31,6 +34,11 @@ typedef enum {
   INTERPRET_COMPILE_ERROR,
   INTERPRETER_RUNTUME_ERROR
 } InterpreterResult;
+
+/// Getter for vm singletone
+///
+/// @return Vm*, pointer to Vm singletone
+Vm* vm_instance();
 
 /// Initializes virtual machine (singletone)
 ///

@@ -47,6 +47,12 @@ static ObjString *string_allocate(char *chars, u32 length) {
 static Obj* object_allocate(usize size, ObjKind kind) {
   Obj *pobj = (Obj*)reallocate(NULL, 0, size);
   pobj->kind = kind;
+
+  Vm* vm = vm_instance();
+
+  pobj->next = vm->objects;
+  vm->objects = pobj;
+
   return pobj;
 }
 

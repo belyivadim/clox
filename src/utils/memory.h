@@ -23,6 +23,8 @@ enum {
 #define FREE_ARRAY(T, ptr, old_count) \
   reallocate(ptr, sizeof(T) * old_count, 0)
 
+#define FREE(T, ptr) reallocate(ptr, sizeof(T), 0)
+
 #define ALLOCATE(T, count) \
   (T*)reallocate(NULL, 0, sizeof(T) * (count))
 
@@ -35,5 +37,10 @@ enum {
 /// @param new_size new size in bytes
 /// @return void*, pointer to newly allocated memory or NULL in case if new_size is 0
 void *reallocate(void *ptr, usize old_size, usize new_size);
+
+/// Frees all heap-allocated objects in virtual machine singleton
+///
+/// @return void
+void free_objects();
 
 #endif // !__CLOX_MEMORY_H__
