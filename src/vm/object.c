@@ -14,7 +14,7 @@
 /// @param chars: pointer to the heap allocated array of chars
 /// @param length: length of the chars array
 /// @return ObjString*, pointer to newly allocated string object
-static ObjString *string_allocate(char *chars, u32 length);
+static ObjString *string_allocate(char *chars, u32 length, u32 hash);
 
 
 /// Allocates new Obj of kind param
@@ -24,24 +24,41 @@ static ObjString *string_allocate(char *chars, u32 length);
 /// @return Obj*, pointer to newly allocated object
 static Obj* object_allocate(usize size, ObjKind kind);
 
+static u32 string_hash(const char *key, u32 length);
+
 ObjString *string_copy(const char *chars, u32 length) {
+  u32 hash = string_hash(chars, length);
+
   char * heap_chars = ALLOCATE(char, length + 1);
   memcpy(heap_chars, chars, length);
   heap_chars[length] = '\0';
 
-  return string_allocate(heap_chars, length);
+  return string_allocate(heap_chars, length, hash);
 }
 
 ObjString *string_create(char *chars, u32 length) {
-  return string_allocate(chars, length);
+  u32 hash = string_hash(chars, length);
+  return string_allocate(chars, length, hash);
 }
 
-static ObjString *string_allocate(char *chars, u32 length) {
+static ObjString *string_allocate(char *chars, u32 length, u32 hash) {
   ObjString* str = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   str->length = length;
   str->chars = chars;
+  str->hash = hash;
 
   return str;
+}
+
+static u32 string_hash(const char *key, u32 length) {
+  u32 hash = 2166136261u;
+
+  for (u32 i = 0; i < length; ++i) {
+    hash ^= key[i];
+    hash *= 16777619;
+  }
+
+  return hash;
 }
 
 static Obj* object_allocate(usize size, ObjKind kind) {

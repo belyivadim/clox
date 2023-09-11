@@ -40,6 +40,9 @@ struct ObjString {
 
   /// Actual representation of the string
   char *chars;
+
+  /// cache for the hash value of string pointed by chars
+  u32 hash;
 };
 
 
