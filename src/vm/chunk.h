@@ -7,9 +7,9 @@
 /// Represents the operation code
 typedef enum {
   /// Takes a single byte operand
-  /// that specifies the index in Chunk's constants array to the constant value
+  ///   that specifies the index in Chunk's constants array to the constant value
   ///
-  /// Interpreting: Pushes constant onto VM's stack.
+  /// @Interpreting: Pushes constant onto VM's stack.
   /// 
   /// @size - 2 bytes
   OP_CONSTANT, 
@@ -19,30 +19,30 @@ typedef enum {
   ///
   /// opcode essentilly is the same as OP_CONSTANT, but allowed indexes greater than 255
   ///
-  /// Interpreting: Pushes constant onto VM's stack.
+  /// @Interpreting: Pushes constant onto VM's stack.
   ///
   /// @size - 4 bytes
   OP_CONSTANT_LONG,
 
   /// Bare opcode, takes no operands
-  /// Interpreting: Represents a nil value
+  /// @Interpreting: Represents a nil value
   /// @size - 1 byte
   OP_NIL,
 
   /// Bare opcode, takes no operands
-  /// Interpreting: Represents a boolean true value
+  /// @Interpreting: Represents a boolean true value
   /// @size - 1 byte
   OP_TRUE,
 
   /// Bare opcode, takes no operands
-  /// Interpreting: Represents a boolean false value
+  /// @Interpreting: Represents a boolean false value
   /// @size - 1 byte
   OP_FALSE,
 
 
   /// Bare opcodes, take no operands
-  /// Interpreting: Pops two values from the top of the VM's stack,
-  /// perform comparison, and push result back onto the stack as bool
+  /// @Interpreting: Pops two values from the top of the VM's stack,
+  ///   perform comparison, and push result back onto the stack as bool
   /// @size - 1 byte
   OP_EQUAL,
   OP_NOT_EQUAL,
@@ -52,46 +52,51 @@ typedef enum {
   OP_LESS_EQUAL,
 
   /// Bare opcode, takes no operands
-  /// Interpreting: Converts a value to boolean and applies not to it
+  /// @Interpreting: Converts a value to boolean and applies not to it
   /// @size - 1 byte
   OP_NOT,
 
   /// Bare opcode, takes no operands
-  /// Interpreting: Negates top value of the VM's stack
+  /// @Interpreting: Negates top value of the VM's stack
   /// @size - 1 byte
   OP_NEGATE,
 
   /// Bare opcode, takes no operands
-  /// Interpreting: Pops two values from the top of the VM's stack,
-  /// adds them, and pushes result back onto the stack
+  /// @Interpreting: Pops two values from the top of the VM's stack,
+  ///   adds them, and pushes result back onto the stack
   /// @size - 1 byte
   OP_ADD,
 
   /// Bare opcode, takes no operands
-  /// Interpreting: Pops two values from the top of the VM's stack,
-  /// substracts them, and pushes result back onto the stack
+  /// @Interpreting: Pops two values from the top of the VM's stack,
+  ///   substracts them, and pushes result back onto the stack
   /// @size - 1 byte
   OP_SUBSTRACT,
 
   /// Bare opcode, takes no operands
-  /// Interpreting: Pops two values from the top of the VM's stack,
-  /// multiplies them, and pushes result back onto the stack
+  /// @Interpreting: Pops two values from the top of the VM's stack,
+  ///   multiplies them, and pushes result back onto the stack
   /// @size - 1 byte
   OP_MULTIPLY,
 
   /// Bare opcode, takes no operands
-  /// Interpreting: Pops two values from the top of the VM's stack,
+  /// @Interpreting: Pops two values from the top of the VM's stack,
   /// divides them, and pushes result back onto the stack
   /// @size - 1 byte
   OP_DIVIDE,
 
   /// Bare opcode, takes no operands
   /// Used by built-in print statements
-  /// Interpreting: prints to stdout 
+  /// @Interpreting: prints to stdout 
   ///   string representation of the top value on the stack,
   ///   pops top value from the stack
   /// @size - 1 byte
   OP_PRINT,
+
+  /// Bare opcode, takes no operands
+  /// @Interpreting: simply pops top value from the stack
+  /// @size - 1 byte
+  OP_POP,
 
   /// Bare opcode, takes no operands
   /// @size - 1 byte

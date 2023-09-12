@@ -246,6 +246,8 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_POP: vm_stack_pop(); break;
+
       case OP_RETURN:
         return INTERPRET_OK;
     }

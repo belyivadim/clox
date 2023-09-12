@@ -173,9 +173,27 @@ static void string_handler();
 static void declaration_handler();
 static void statement_handler();
 static void print_st_handler();
+static void expression_st_hanler();
 
+/// Checks if parser's current token is of the same kind as kind param
+///   advances if it is
+///
+/// @param kind: kind to compare with
+/// @return bool, true if matched, false otherwise
 static bool match(TokenKind kind);
+
+/// Checks if parser's current token is of the same kind as kind param
+///
+/// @param kind: kind to compare with
+/// @return bool, true if passed the check, false otherwise
 static bool check(TokenKind kind);
+
+/// Synchronizes parser's state after entering panic_mode
+///   by skipping all the tokens until encounter an synchronization point
+///   (such as semicolon or control flow statement) or TOK_EOF
+///
+/// @return void
+static void synchronize();
 
 /// Parses all the subsequent expression with the precedence
 /// equal or higher than precedence param
@@ -260,11 +278,15 @@ bool compile(const char *source, Chunk *chunk) {
 
 static void declaration_handler() {
   statement_handler();
+
+  if (parser.panic_mode) synchronize();
 }
 
 static void statement_handler() {
   if (match(TOK_PRINT)) {
     print_st_handler();
+  } else {
+    expression_st_hanler();
   }
 }
 
@@ -274,6 +296,37 @@ static void print_st_handler() {
   emit_byte(OP_PRINT);
 }
 
+static void expression_st_hanler() {
+  expression();
+  consume(TOK_SEMICOLON, "Expect ';' after value.");
+  emit_byte(OP_POP);
+}
+
+
+static void synchronize() {
+  parser.panic_mode = false;
+
+  while (parser.current.kind != TOK_EOF) {
+    if (TOK_SEMICOLON == parser.previous.kind) return;
+
+    switch (parser.current.kind) {
+      case TOK_CLASS:
+      case TOK_FUN:
+      case TOK_VAR:
+      case TOK_FOR:
+      case TOK_IF:
+      case TOK_WHILE:
+      case TOK_PRINT:
+      case TOK_RETURN:
+        return;
+
+      default:
+        ; // do nothing
+    }
+
+    advance();
+  }
+}
 
 static bool match(TokenKind kind) {
   if (!check(kind)) return false;

@@ -73,6 +73,8 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
       return simple_instruction("OP_PRINT", offset);
     case OP_RETURN:
       return simple_instruction("OP_RETURN", offset);
+    case OP_POP:
+      return simple_instruction("OP_POP", offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;
