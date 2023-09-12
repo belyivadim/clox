@@ -49,11 +49,15 @@ Vm* vm_instance() {
 
 void vm_init() {
   vm_stack_reset();
-  vm_instance()->objects = NULL;
+  Vm* vm = vm_instance();
+  vm->objects = NULL;
+  table_init(&vm->strings);
 }
 
 void vm_free() {
   free_objects();
+  Vm* vm = vm_instance();
+  table_free(&vm->strings);
 }
 
 void vm_stack_push(Value value) {
@@ -105,7 +109,7 @@ static void concatenate() {
   memcpy(chars + lhs->length, rhs->chars, rhs->length);
   chars[length] = '\0';
 
-  ObjString * result = string_create(chars, length);
+  const ObjString * result = string_create(chars, length);
   vm_stack_push(OBJ_VAL(result));
 }
 

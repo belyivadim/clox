@@ -50,13 +50,7 @@ bool values_equal(Value lhs, Value rhs) {
     case VAL_BOOL: return AS_BOOL(lhs) == AS_BOOL(rhs);
     case VAL_NIL: return true;
     case VAL_NUMBER: return AS_NUMBER(lhs) == AS_NUMBER(rhs);
-    case VAL_OBJ: {
-      ObjString *po_lhs = AS_STRING(lhs);
-      ObjString *po_rhs = AS_STRING(rhs);
-
-      return po_lhs->length == po_rhs->length
-          && 0 == memcmp(po_lhs->chars, po_rhs->chars, po_lhs->length);
-    }
+    case VAL_OBJ: return AS_OBJ(lhs) == AS_OBJ(rhs);
 
     default:
       return false; // unreachable

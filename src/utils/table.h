@@ -58,7 +58,7 @@ bool table_set(Table* table, const ObjString *key, Value value);
 /// @param key: pointer to the key value associated with
 /// @outparam value: pointer to the found value (untouched if not found)
 /// @return bool, true if value was found, false otherwise
-bool table_get(Table* table, const ObjString *key, Value* value);
+bool table_get(const Table* table, const ObjString *key, Value* value);
 
 /// Deletes entry associated with the key in the table
 ///
@@ -66,6 +66,15 @@ bool table_get(Table* table, const ObjString *key, Value* value);
 /// @param key: pointer to the key value associated with
 /// @return bool, true if entry was found and deleted, false otherwise
 bool table_delete(Table *table, const ObjString *key);
+
+/// Looks up for a key that are equal to the string in chars array 
+///
+/// @param table: pointer to the table to look up in
+/// @param chars: pointer to char array string object' chars should be equal to
+/// @param length: length of the chars array,
+/// @param hash: hash of the chars array
+/// @return const ObjString*, pointer to the found string object
+const ObjString* table_find_string(const Table *table, const char *chars, u32 length, u32 hash);
 
 /// Inserts all entries from src to dest
 ///

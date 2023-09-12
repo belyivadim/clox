@@ -64,7 +64,7 @@ bool table_set(Table* table, const ObjString *key, Value value) {
   return is_new_key;
 }
 
-bool table_get(Table* table, const ObjString *key, Value* value) {
+bool table_get(const Table* table, const ObjString *key, Value* value) {
   assert(NULL != table);
 
   if (0 == table->count) return false;
@@ -91,6 +91,30 @@ bool table_delete(Table *table, const ObjString *key) {
   ++table->tombstones_count;
 
   return true;
+}
+
+const ObjString* table_find_string(const Table *table, const char *chars, u32 length, u32 hash) {
+  assert(NULL != table);
+  assert(NULL != chars);
+
+  if (0 == table->count) return NULL;
+
+  u32 index = hash % table->capacity;
+
+  for (;;) {
+    Entry *pentry = table->entries + index;
+
+    if (NULL == pentry->key) {
+      if (IS_NIL(pentry->value)) return NULL; // empty, non tombstone value is found
+    } else if (pentry->key->length == length 
+              && pentry->key->hash == hash
+              && 0 == memcmp(pentry->key->chars, chars, length)) {
+      // key is found
+      return pentry->key;
+    }
+
+    index = (index + 1) % table->capacity;
+  }
 }
 
 void table_add_all(Table* dest, const Table *src) {

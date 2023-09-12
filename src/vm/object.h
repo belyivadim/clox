@@ -63,14 +63,14 @@ static inline bool is_obj_kind(Value value, ObjKind kind) {
 /// @param chars: pointer to the c-string to be copied
 /// @param length: the length of the chars array
 /// @return ObjString
-ObjString *string_copy(const char *chars, u32 length);
+const ObjString *string_copy(const char *chars, u32 length);
 
 /// Creates a string object from chars array, takes ownership on chars param
 ///
 /// @param chars: an array of characters to create a string based on
 /// @param length: a length of the array
 /// @return ObjString*, pointer to the newly allocated string object
-ObjString *string_create(char *chars, u32 length);
+const ObjString *string_create(char *chars, u32 length);
 
 /// Prints the value param as an object
 ///

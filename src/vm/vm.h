@@ -2,6 +2,7 @@
 #define __CLOX_VM_H__
 
 #include "chunk.h"
+#include "../utils/table.h"
 
 enum {
   STACK_MAX = 1024
@@ -23,6 +24,9 @@ typedef struct {
   /// it points to the slot where next value will be pushed,
   /// and not actual top value of the stack
   Value *stack_top;
+
+  /// Hashset of interning strings
+  Table strings;
 
   // Pointer to the head of the list of heap allocated objects
   Obj *objects;

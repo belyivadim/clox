@@ -26,8 +26,13 @@ static Obj* object_allocate(usize size, ObjKind kind);
 
 static u32 string_hash(const char *key, u32 length);
 
-ObjString *string_copy(const char *chars, u32 length) {
+const ObjString *string_copy(const char *chars, u32 length) {
   u32 hash = string_hash(chars, length);
+
+  const ObjString* interned = 
+    table_find_string(&vm_instance()->strings, chars, length, hash);
+
+  if (NULL != interned) return interned;
 
   char * heap_chars = ALLOCATE(char, length + 1);
   memcpy(heap_chars, chars, length);
@@ -36,8 +41,17 @@ ObjString *string_copy(const char *chars, u32 length) {
   return string_allocate(heap_chars, length, hash);
 }
 
-ObjString *string_create(char *chars, u32 length) {
+const ObjString *string_create(char *chars, u32 length) {
   u32 hash = string_hash(chars, length);
+
+  const ObjString *interned =
+    table_find_string(&vm_instance()->strings, chars, length, hash);
+
+  if (NULL != interned) {
+    FREE_ARRAY(char, chars, length + 1);
+    return interned;
+  }
+
   return string_allocate(chars, length, hash);
 }
 
@@ -47,6 +61,9 @@ static ObjString *string_allocate(char *chars, u32 length, u32 hash) {
   str->chars = chars;
   str->hash = hash;
 
+  table_set(&vm_instance()->strings, str, NIL_VAL);
+
+  printf("New ObjString is allocated at %p\n", str);
   return str;
 }
 
