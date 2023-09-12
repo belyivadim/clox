@@ -27,7 +27,7 @@ static void repl();
 ///
 /// @param path path to the file to be ran
 /// @return void
-static void run_file(const char *path);
+static InterpreterResult run_file(const char *path);
 
 /// Reads content of the file and returns it.
 /// Function allocates memory for returning content.
@@ -57,13 +57,14 @@ static void repl() {
   }
 }
 
-static void run_file(const char *path) {
+static InterpreterResult run_file(const char *path) {
   char *src = read_file(path);
   InterpreterResult result = vm_interpret(src);
   free(src);
 
-  if (INTERPRET_COMPILE_ERROR == result) exit(65);
-  if (INTERPRETER_RUNTUME_ERROR == result) exit(70);
+  if (INTERPRET_COMPILE_ERROR == result) return 65;
+  if (INTERPRETER_RUNTUME_ERROR == result) return 70;
+  return 0;
 }
 
 static char *read_file(const char *path) {
@@ -92,16 +93,17 @@ static char *read_file(const char *path) {
 int main(int argc, char *argv[])
 {
   vm_init();
+  InterpreterResult exit_code = 0;
 
   if (1 == argc) {
     repl();
   } else if (argc == 2) {
-    run_file(argv[1]);
+    exit_code = run_file(argv[1]);
   } else {
     fprintf(stderr, "Usage: clox [path]\n");
   }
   
   vm_free();
 
-  return 0;
+  return exit_code;
 }

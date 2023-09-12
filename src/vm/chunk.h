@@ -131,6 +131,22 @@ typedef enum {
   /// @size - 4 bytes
   OP_GET_GLOBAL_LONG,
 
+  /// Takes 1 byte operand that is index in chunk's constants array
+  ///   which is pointed to the global variable name
+  ///
+  /// @Interpreting: reads operand, looks up for that name in VM's globals table,
+  ///   if such key is present pushes overrites it with value from the top of VM's stack,
+  ///   otherwise reports runtime error and returns with INTERPRET_RUNTIME_ERROR
+  /// @size - 2 bytes
+  OP_SET_GLOBAL,
+  
+  /// Takes 3 bytes (24-bits) operand
+  ///   which is pointed to the global variable name
+  ///
+  /// @essentially is the same as OP_SET_GLOBAL, difference is only in operand size
+  /// @size - 4 bytes
+  OP_SET_GLOBAL_LONG,
+
   /// Bare opcode, takes no operands
   /// @size - 1 byte
   OP_RETURN, 

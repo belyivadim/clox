@@ -45,7 +45,7 @@ typedef enum {
 } Precedence;
 
 /// Represents the type of a function for parse rules table
-typedef void (*ParseFn)();
+typedef void (*ParseFn)(bool can_assign);
 
 /// Represents the parse rule in parse table
 typedef struct {
@@ -134,49 +134,50 @@ static void error(const char *message);
 /// requires parser's previous field to be of TOK_NUMBER kind
 ///
 /// @return void
-static void number_handler();
+static void number_handler(bool can_assign);
 
 /// Handles grouping expression,
 /// requires parser's previous field to be of TOK_LEFT_PAREN kind
 ///
 /// @return void
-static void grouping_handler();
+static void grouping_handler(bool can_assign);
 
 /// Handles unary expression,
 /// requires parser's previous field to be of TOK_MINUS or TOK_BANG kind
 ///
 /// @return void
-static void unary_handler();
+static void unary_handler(bool can_assign);
 
 /// Handles binary expression,
 /// requires parser's previous field to be of 
 /// TOK_MINUS, TOK_PLUS, TOK_SLASH or TOK_STAR kind
 ///
 /// @return void
-static void binary_handler();
+static void binary_handler(bool can_assign);
 
 /// Handles literal expression,
 /// requires parser's previous field to be of 
 /// TOK_FALSE, TOK_TRUE, or TOK_NIL kind
 ///
 /// @return void
-static void literal_hanler();
+static void literal_hanler(bool can_assign);
 
 /// Handles string expression,
 /// requires parser's previous field to be of 
 /// TOK_STRING kind
 ///
 /// @return void
-static void string_handler();
+static void string_handler(bool can_assign);
 
-static void variable_handler();
+static void variable_handler(bool can_assign);
 
 /// Writes ObjString based on the lexeme in name param as Value to the current chunk's constants array,
-///   and emits OP_GET_GLOBAL* opcode with index of that value
+///   and emits OP_<GET/SET>_GLOBAL* opcode with index of that value
 ///
 /// @param name: pointer to the token of kind TOK_IDENTIFIER
+/// @param can_assign, flag that specifies if current context is allowed to perform assign operation
 /// return void
-static void named_variable(const Token *name);
+static void named_variable(const Token *name, bool can_assign);
 
 
 static void declaration_handler();
@@ -429,10 +430,12 @@ static void error_at_current(const char *message) {
 }
 
 static void error_at(const Token *token, const char *message) {
+#define ERROR_COLOR COLOR_FG_RED
+
   if (parser.panic_mode) return;
   parser.panic_mode = true;
 
-  fprintf(stderr, "[line %d] Error", token->line);
+  fprintf(stderr, ERROR_COLOR "[line %d] Error", token->line);
 
   if (token->kind == TOK_EOF) {
     fprintf(stderr, " at end");
@@ -442,9 +445,11 @@ static void error_at(const Token *token, const char *message) {
     fprintf(stderr, " at '%.*s'", token->length, token->start);
   }
 
-  fprintf(stderr, ": %s\n", message);
+  fprintf(stderr, ": %s\n" COLOR_FG_RESET, message);
 
   parser.had_error = true;
+
+#undef ERROR_COLOR
 }
 
 static void error(const char *message) {
@@ -486,19 +491,22 @@ static void expression() {
 }
 
 
-static void number_handler() {
+static void number_handler(bool can_assign) {
+  (void)can_assign;
   assert(TOK_NUMBER == parser.previous.kind);
   double value = strtod(parser.previous.start, NULL);
   emit_constant(NUMBER_VAL(value));
 }
 
-static void grouping_handler() {
+static void grouping_handler(bool can_assign) {
+  (void)can_assign;
   assert(TOK_LEFT_PAREN == parser.previous.kind);
   expression();
   consume(TOK_RIGHT_PAREN, "Expect ')' after expression.");
 }
 
-static void unary_handler() {
+static void unary_handler(bool can_assign) {
+  (void)can_assign;
   TokenKind operator_kind = parser.previous.kind;
 
   assert(TOK_MINUS == operator_kind || TOK_BANG == operator_kind);
@@ -515,7 +523,8 @@ static void unary_handler() {
   }
 }
 
-static void binary_handler() {
+static void binary_handler(bool can_assign) {
+  (void)can_assign;
   TokenKind operator_kind = parser.previous.kind;
 
   // compile the right operand
@@ -544,7 +553,8 @@ static void binary_handler() {
   }
 }
 
-static void literal_hanler() {
+static void literal_hanler(bool can_assign) {
+  (void)can_assign;
   TokenKind kind = parser.previous.kind;
   assert(TOK_NIL == kind || TOK_FALSE == kind || TOK_TRUE == kind);
 
@@ -558,19 +568,25 @@ static void literal_hanler() {
   }
 }
 
-static void string_handler() {
+static void string_handler(bool can_assign) {
+  (void)can_assign;
   // emits string literal with trimed quotes
   emit_constant(OBJ_VAL(string_copy(parser.previous.start + 1,
                                     parser.previous.length - 2)));
 }
 
-static void variable_handler() {
-  named_variable(&parser.previous);
+static void variable_handler(bool can_assign) {
+  named_variable(&parser.previous, can_assign);
 }
 
-static void named_variable(const Token *name) {
+static void named_variable(const Token *name, bool can_assign) {
   i32 param = identintifier_constant(name);
-  emit_opcode_with_constant_param(OP_GET_GLOBAL, param);
+  if (can_assign && match(TOK_EQUAL)) {
+    expression();
+    emit_opcode_with_constant_param(OP_SET_GLOBAL, param);
+  } else {
+    emit_opcode_with_constant_param(OP_GET_GLOBAL, param);
+  }
 }
 
 static void parse_precedence(Precedence precedence) {
@@ -582,13 +598,19 @@ static void parse_precedence(Precedence precedence) {
     return;
   }
 
-  prefix_rule();
+  bool can_assign = precedence <= PREC_ASSIGMENT;
+
+  prefix_rule(can_assign);
 
   while (precedence <= get_rule(parser.current.kind)->precedence) {
     advance();
     ParseFn infix_rule = get_rule(parser.previous.kind)->infix;
     assert(NULL != infix_rule);
-    infix_rule();
+    infix_rule(can_assign);
+  }
+
+  if (can_assign && match(TOK_EQUAL)) {
+    error("Invalid assigment target.");
   }
 }
 

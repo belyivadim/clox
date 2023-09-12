@@ -42,6 +42,7 @@ static InterpreterResult vm_run();
 static void vm_process_constant(Value constant);
 static void vm_process_define_global(const ObjString *name);
 static InterpreterResult vm_process_get_global(const ObjString *name);
+static InterpreterResult vm_process_set_global(const ObjString *name);
 static void vm_process_return();
 
 Vm* vm_instance() {
@@ -283,6 +284,23 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_SET_GLOBAL: {
+        InterpreterResult result = vm_process_set_global(READ_STRING());
+        if (INTERPRET_OK != result) {
+          return result;
+        }
+        break;
+      }
+
+      case OP_SET_GLOBAL_LONG: {
+        InterpreterResult result = vm_process_set_global(READ_STRING_LONG());
+        if (INTERPRET_OK != result) {
+          return result;
+        }
+        SKIP_BYTES(3);
+        break;
+      }
+
       case OP_RETURN:
         return INTERPRET_OK;
     }
@@ -320,6 +338,15 @@ static InterpreterResult vm_process_get_global(const ObjString *name) {
   return INTERPRET_OK;
 }
 
+static InterpreterResult vm_process_set_global(const ObjString *name) {
+  Table *globals = &vm_instance()->globals;
+  if (table_set(globals, name, *vm_stack_top())) {
+    table_delete(globals, name);
+    runtime_error("Undefined variable '%s'.", name->chars);
+    return INTERPRETER_RUNTUME_ERROR;
+  }
+  return INTERPRET_OK;
+}
 
 static void vm_process_return() {
   value_print(vm_stack_pop());
@@ -328,17 +355,20 @@ static void vm_process_return() {
 
 
 static void runtime_error(const char *format, ...) {
+#define ERROR_COLOR COLOR_FG_RED
+
+  Vm *vm = vm_instance();
+  i32 instruction = vm->ip - vm->chunk->code - 1;
+  i32 line = chunk_get_line(vm->chunk, instruction);
+  fprintf(stderr, ERROR_COLOR "[line %d] in script: ", line);
+
   va_list args;
   va_start(args, format);
   vfprintf(stderr, format, args);
   va_end(args);
-  fputs("\n", stderr);
+  fputs("\n" COLOR_FG_RESET, stderr);
   
-  Vm *vm = vm_instance();
-  i32 instruction = vm->ip - vm->chunk->code - 1;
-  i32 line = chunk_get_line(vm->chunk, instruction);
-
-  fprintf(stderr, "[line %d] in script\n", line);
-
   vm_stack_reset();
+
+#undef ERROR_COLOR
 }
