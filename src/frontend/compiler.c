@@ -169,6 +169,14 @@ static void literal_hanler();
 /// @return void
 static void string_handler();
 
+
+static void declaration_handler();
+static void statement_handler();
+static void print_st_handler();
+
+static bool match(TokenKind kind);
+static bool check(TokenKind kind);
+
 /// Parses all the subsequent expression with the precedence
 /// equal or higher than precedence param
 ///
@@ -241,14 +249,41 @@ bool compile(const char *source, Chunk *chunk) {
   parser.panic_mode = false;
 
   advance();
-  expression();
-  consume(TOK_EOF, "Expect end of expression.");
+  while (!match(TOK_EOF)) {
+    declaration_handler();
+  }
 
   end_compiler();
 
   return !parser.had_error;
 }
 
+static void declaration_handler() {
+  statement_handler();
+}
+
+static void statement_handler() {
+  if (match(TOK_PRINT)) {
+    print_st_handler();
+  }
+}
+
+static void print_st_handler() {
+  expression();
+  consume(TOK_SEMICOLON, "Expect ';' after value.");
+  emit_byte(OP_PRINT);
+}
+
+
+static bool match(TokenKind kind) {
+  if (!check(kind)) return false;
+  advance();
+  return true;
+}
+
+static bool check(TokenKind kind) {
+  return kind == parser.current.kind;
+}
 
 static void advance() {
   parser.previous = parser.current;

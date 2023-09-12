@@ -69,6 +69,8 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
       return simple_instruction("OP_DIVIDE", offset);
     case OP_NEGATE:
       return simple_instruction("OP_NEGATE", offset);
+    case OP_PRINT:
+      return simple_instruction("OP_PRINT", offset);
     case OP_RETURN:
       return simple_instruction("OP_RETURN", offset);
     default:

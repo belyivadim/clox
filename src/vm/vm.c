@@ -239,8 +239,14 @@ static InterpreterResult vm_run() {
         vm_stack_top()->as.number = -AS_NUMBER(*vm_stack_top());
         break;
       }
+
+      case OP_PRINT: {
+        value_print(vm_stack_pop());
+        printf("\n");
+        break;
+      }
+
       case OP_RETURN:
-        vm_process_return();
         return INTERPRET_OK;
     }
   }

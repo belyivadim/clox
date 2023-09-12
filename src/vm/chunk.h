@@ -86,6 +86,14 @@ typedef enum {
   OP_DIVIDE,
 
   /// Bare opcode, takes no operands
+  /// Used by built-in print statements
+  /// Interpreting: prints to stdout 
+  ///   string representation of the top value on the stack,
+  ///   pops top value from the stack
+  /// @size - 1 byte
+  OP_PRINT,
+
+  /// Bare opcode, takes no operands
   /// @size - 1 byte
   OP_RETURN, 
 } OpCode;
