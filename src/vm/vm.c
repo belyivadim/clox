@@ -40,6 +40,8 @@ static void concatenate();
 
 static InterpreterResult vm_run();
 static void vm_process_constant(Value constant);
+static void vm_process_define_global(const ObjString *name);
+static InterpreterResult vm_process_get_global(const ObjString *name);
 static void vm_process_return();
 
 Vm* vm_instance() {
@@ -51,12 +53,14 @@ void vm_init() {
   vm_stack_reset();
   Vm* vm = vm_instance();
   vm->objects = NULL;
+  table_init(&vm->globals);
   table_init(&vm->strings);
 }
 
 void vm_free() {
   free_objects();
   Vm* vm = vm_instance();
+  table_free(&vm->globals);
   table_free(&vm->strings);
 }
 
@@ -145,6 +149,9 @@ static InterpreterResult vm_run() {
     chunk_get_constant_long_index(vm->chunk, OFFSET())\
   ])
 #define SKIP_BYTES(n) (vm->ip += (n))
+
+#define READ_STRING() AS_STRING(READ_CONSTANT())
+#define READ_STRING_LONG() AS_STRING(READ_CONSTANT_LONG())
 
 #define BINARY_OP(value_kind, op) \
   do { \
@@ -248,6 +255,34 @@ static InterpreterResult vm_run() {
 
       case OP_POP: vm_stack_pop(); break;
 
+      case OP_DEFINE_GLOBAL: {
+        vm_process_define_global(READ_STRING());
+        break;
+      }
+
+      case OP_DEFINE_GLOBAL_LONG: {
+        vm_process_define_global(READ_STRING_LONG());
+        SKIP_BYTES(3);
+        break;
+      }
+
+      case OP_GET_GLOBAL: {
+        InterpreterResult result = vm_process_get_global(READ_STRING());
+        if (INTERPRET_OK != result) {
+          return result;
+        }
+        break;
+      }
+
+      case OP_GET_GLOBAL_LONG: {
+        InterpreterResult result = vm_process_get_global(READ_STRING_LONG());
+        if (INTERPRET_OK != result) {
+          return result;
+        }
+        SKIP_BYTES(3);
+        break;
+      }
+
       case OP_RETURN:
         return INTERPRET_OK;
     }
@@ -256,6 +291,8 @@ static InterpreterResult vm_run() {
 #undef PRINT_DEBUG_INFO
 #undef BINARY_OP
 #undef SKIP_BYTES
+#undef READ_STRING
+#undef READ_STRING_LONG
 #undef READ_CONSTANT_LONG
 #undef READ_CONSTANT
 #undef READ_BYTE
@@ -266,6 +303,23 @@ static InterpreterResult vm_run() {
 static void vm_process_constant(Value constant) {
   vm_stack_push(constant);
 }
+
+static void vm_process_define_global(const ObjString *name) {
+  table_set(&vm_instance()->globals, name, *vm_stack_peek(0));
+  vm_stack_pop();
+}
+
+static InterpreterResult vm_process_get_global(const ObjString *name) {
+  Value value;
+  if (!table_get(&vm_instance()->globals, name, &value)) {
+    runtime_error("Undefined variable '%s'.", name->chars);
+    return INTERPRETER_RUNTUME_ERROR;
+  }
+
+  vm_stack_push(value);
+  return INTERPRET_OK;
+}
+
 
 static void vm_process_return() {
   value_print(vm_stack_pop());

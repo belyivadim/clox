@@ -60,7 +60,7 @@ void chunk_write(Chunk *chunk, u8 byte, i32 line) {
   ++chunk->code_count;
 }
 
-void chunk_write_constant(Chunk *chunk, Value value, i32 line) {
+i32 chunk_write_constant(Chunk *chunk, Value value, i32 line) {
   assert(NULL != chunk);
 
   i32 idx = chunk_add_constant(chunk, value);
@@ -73,6 +73,8 @@ void chunk_write_constant(Chunk *chunk, Value value, i32 line) {
     chunk_write(chunk, (u8)(idx >> 8), line);
     chunk_write(chunk, (u8)(idx), line);
   }
+
+  return idx;
 }
 
 i32 chunk_get_constant_long_index(const Chunk *chunk, i32 offset) {

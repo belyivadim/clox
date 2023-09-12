@@ -25,6 +25,9 @@ typedef struct {
   /// and not actual top value of the stack
   Value *stack_top;
 
+  /// Hashtable of global identifiers 
+  Table globals;
+
   /// Hashset of interning strings
   Table strings;
 

@@ -6,14 +6,17 @@ static i32 simple_instruction(const char *name, i32 offset);
 static i32 constant_instruction(const char *name, const Chunk *chunk, i32 offset);
 static i32 constant_long_instruction(const char *name, const Chunk *chunk, i32 offset);
 
+#define DISASSEMBLE_COLOR COLOR_FG_CYAN
+
 void chunk_disassemble(Chunk *chunk, const char* name) {
   assert(NULL != chunk);
 
-  printf("== %s ==\n", name);
+  printf(DISASSEMBLE_COLOR "== %s ==\n", name);
 
   for (i32 offset = 0; offset < chunk->code_count;) {
     offset = chunk_disassemble_instruction(chunk, offset);
   }
+  printf(COLOR_FG_RESET);
 }
 
 i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
@@ -22,15 +25,15 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
   assert(NULL != chunk->lines);
   assert(offset < chunk->code_count);
 
-  printf("%04d ", offset);
+  printf(DISASSEMBLE_COLOR "%04d ", offset);
 
   i32 curr_line = chunk_get_line(chunk, offset);
   i32 prev_line = chunk_get_line(chunk, offset - 1);
   if (offset > 0 
       && curr_line == prev_line) {
-    printf("   | ");
+    printf("   | " COLOR_FG_RESET);
   } else {
-    printf("%4d ", curr_line);
+    printf("%4d " COLOR_FG_RESET, curr_line);
   }
 
   u8 instruction = chunk->code[offset];
@@ -75,14 +78,25 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
       return simple_instruction("OP_RETURN", offset);
     case OP_POP:
       return simple_instruction("OP_POP", offset);
+    case OP_DEFINE_GLOBAL:
+      return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset);
+    case OP_DEFINE_GLOBAL_LONG:
+      return constant_long_instruction("OP_DEFINE_GLOBAL_LONG", chunk, offset);
+    case OP_GET_GLOBAL:
+      return constant_instruction("OP_GET_GLOBAL", chunk, offset);
+    case OP_GET_GLOBAL_LONG:
+      return constant_long_instruction("OP_GET_GLOBAL_LONG", chunk, offset);
+
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;
   }
+
+  printf(COLOR_FG_RESET);
 }
 
 static i32 simple_instruction(const char *name, i32 offset) {
-  printf("%s\n", name);
+  printf(DISASSEMBLE_COLOR "%s\n" COLOR_FG_RESET, name);
   return offset + 1;
 }
 
@@ -91,9 +105,9 @@ static i32 constant_instruction(const char *name, const Chunk *chunk, i32 offset
   assert(NULL != chunk->constants.values);
 
   u8 idx = chunk->code[offset + 1];
-  printf("%-16s [%6d] '", name, idx);
+  printf(DISASSEMBLE_COLOR "%-16s [%6d] '", name, idx);
   value_print(chunk->constants.values[idx]);
-  puts("'");
+  puts("'" COLOR_FG_RESET);
 
   return offset + 2;
 }
@@ -103,9 +117,9 @@ static i32 constant_long_instruction(const char *name, const Chunk *chunk, i32 o
   assert(NULL != chunk->constants.values);
 
   i32 idx = chunk_get_constant_long_index(chunk, offset + 1);
-  printf("%-16s [%6d] '", name, idx);
+  printf(DISASSEMBLE_COLOR "%-16s [%6d] '", name, idx);
   value_print(chunk->constants.values[idx]);
-  puts("'");
+  puts("'" COLOR_FG_RESET);
 
   return offset + 4;
 

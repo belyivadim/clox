@@ -90,11 +90,11 @@ static void emit_byte(u8 byte);
 /// @return void
 static void emit_return();
 
-/// Emits the constant value to the ValueArray of the currently compiled chunk
+/// Emits OP_CONSTANT* opcode with operand base on value param
 ///
 /// @param value: value to emit
-/// @return void
-static void emit_constant(Value value);
+/// @return i32, index to the value stored in the current chunk's constatnts array
+static i32 emit_constant(Value value);
 
 /// Checks if the current token is of kind param,
 /// if it is then advances the parser,
@@ -169,11 +169,44 @@ static void literal_hanler();
 /// @return void
 static void string_handler();
 
+static void variable_handler();
+
+/// Writes ObjString based on the lexeme in name param as Value to the current chunk's constants array,
+///   and emits OP_GET_GLOBAL* opcode with index of that value
+///
+/// @param name: pointer to the token of kind TOK_IDENTIFIER
+/// return void
+static void named_variable(const Token *name);
+
 
 static void declaration_handler();
 static void statement_handler();
 static void print_st_handler();
 static void expression_st_hanler();
+static void var_decl_handler();
+
+
+/// Parses variable identintifier.
+///   Sets parser in panic mode if it cannot parse the variable identintifier,
+///   and reports an error with the error_msg param
+/// 
+/// @param error_msg: error message to report in case of error
+/// @return i32, index of the variable identifier in chunks constants array
+static i32 parse_variable(const char *error_msg);
+
+/// Writes ObjString as Value to the current chunk's constants array
+///
+/// @param name: pointer to the token of kind TOK_IDENTIFIER
+/// @return i32, index of the variable identifier in chunks constants array
+static i32 identintifier_constant(const Token *name);
+
+/// Emits VM's opcode with the name with index param
+///   where index param is index of constant value in the current chunk's constants array
+///
+/// @param index: index in current chunk's constants value array 
+/// @return void
+static void emit_opcode_with_constant_param(OpCode opcode, i32 index);
+
 
 /// Checks if parser's current token is of the same kind as kind param
 ///   advances if it is
@@ -229,7 +262,7 @@ ParseRule rules[] = {
   [TOK_GREATER_EQUAL] = {NULL, binary_handler, PREC_COMPARISON},
   [TOK_LESS]          = {NULL, binary_handler, PREC_COMPARISON},
   [TOK_LESS_EQUAL]    = {NULL, binary_handler, PREC_COMPARISON},
-  [TOK_IDENTIFIER]    = {NULL, NULL, PREC_NONE},
+  [TOK_IDENTIFIER]    = {variable_handler, NULL, PREC_NONE},
   [TOK_STRING]        = {string_handler, NULL, PREC_NONE},
   [TOK_NUMBER]        = {number_handler, NULL, PREC_NONE},
   [TOK_AND]           = {NULL, NULL, PREC_NONE},
@@ -277,9 +310,15 @@ bool compile(const char *source, Chunk *chunk) {
 }
 
 static void declaration_handler() {
-  statement_handler();
+  if (match(TOK_VAR)) {
+    var_decl_handler();
+  } else {
+    statement_handler();
+  }
 
-  if (parser.panic_mode) synchronize();
+  if (parser.panic_mode) {
+    synchronize();
+  }
 }
 
 static void statement_handler() {
@@ -302,6 +341,42 @@ static void expression_st_hanler() {
   emit_byte(OP_POP);
 }
 
+static void var_decl_handler() {
+  u32 global = parse_variable("Expect variable name");
+
+  if (match(TOK_EQUAL)) {
+    expression();
+  } else {
+    emit_byte(OP_NIL);
+  }
+
+  consume(TOK_SEMICOLON, "Expect ';' after variable declaration");
+
+  emit_opcode_with_constant_param(OP_DEFINE_GLOBAL, global);
+}
+
+
+static i32 parse_variable(const char *error_msg)  {
+  consume(TOK_IDENTIFIER, error_msg);
+  return identintifier_constant(&parser.previous);
+}
+
+static i32 identintifier_constant(const Token *name) {
+  assert(TOK_IDENTIFIER == name->kind);
+  return chunk_add_constant(current_chunk(), OBJ_VAL(string_copy(name->start, name->length)));
+}
+
+static void emit_opcode_with_constant_param(OpCode opcode, i32 index) {
+  if (index < 256) {
+    emit_byte(opcode);
+    emit_byte((u8)index);
+  } else {
+    emit_byte((OpCode)(opcode + 1));
+    emit_byte((u8)(index >> 16));
+    emit_byte((u8)(index >> 8));
+    emit_byte((u8)(index));
+  }
+}
 
 static void synchronize() {
   parser.panic_mode = false;
@@ -402,8 +477,8 @@ static void emit_return() {
   emit_byte(OP_RETURN);
 }
 
-static void emit_constant(Value value) {
-  chunk_write_constant(current_chunk(), value, parser.previous.line);
+static i32 emit_constant(Value value) {
+  return chunk_write_constant(current_chunk(), value, parser.previous.line);
 }
 
 static void expression() {
@@ -487,6 +562,15 @@ static void string_handler() {
   // emits string literal with trimed quotes
   emit_constant(OBJ_VAL(string_copy(parser.previous.start + 1,
                                     parser.previous.length - 2)));
+}
+
+static void variable_handler() {
+  named_variable(&parser.previous);
+}
+
+static void named_variable(const Token *name) {
+  i32 param = identintifier_constant(name);
+  emit_opcode_with_constant_param(OP_GET_GLOBAL, param);
 }
 
 static void parse_precedence(Precedence precedence) {

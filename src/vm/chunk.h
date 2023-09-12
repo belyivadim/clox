@@ -5,6 +5,7 @@
 #include "value.h"
 
 /// Represents the operation code
+///   all *_LONG versions of opcode have numeric value  +1 to their non-long versions
 typedef enum {
   /// Takes a single byte operand
   ///   that specifies the index in Chunk's constants array to the constant value
@@ -17,7 +18,7 @@ typedef enum {
   /// Takes 3 bytes (24-bits) operand
   /// that specifies the index in Chunk's constants array to the constant value
   ///
-  /// opcode essentilly is the same as OP_CONSTANT, but allowed indexes greater than 255
+  /// opcode essentially is the same as OP_CONSTANT, but allowed indexes greater than 255
   ///
   /// @Interpreting: Pushes constant onto VM's stack.
   ///
@@ -98,6 +99,38 @@ typedef enum {
   /// @size - 1 byte
   OP_POP,
 
+  /// Takes 1 byte operand that is index in chunk's constants array
+  ///   which is pointed to the global variable name
+  ///
+  /// @Interpreting: reads the operand, gets the name from chunk's constants array
+  ///   and defines a global variable with that name, assigning the top value from VM's stack to it
+  /// @size - 2 bytes
+  OP_DEFINE_GLOBAL,
+
+  /// Takes 3 bytes (24-bits) operand
+  ///   which is pointed to the global variable name
+  ///
+  /// @essentially is the same as OP_DEFINE_GLOBAL, difference is only in operand size
+  /// @size - 4 bytes
+  OP_DEFINE_GLOBAL_LONG,
+
+
+  /// Takes 1 byte operand that is index in chunk's constants array
+  ///   which is pointed to the global variable name
+  ///
+  /// @Interpreting: reads operand, looks up for that name in VM's globals table,
+  ///   if such key is present pushes associated value to the VM's stack,
+  ///   otherwise reports runtime error and returns with INTERPRET_RUNTIME_ERROR
+  /// @size - 2 bytes
+  OP_GET_GLOBAL,
+
+  /// Takes 3 bytes (24-bits) operand
+  ///   which is pointed to the global variable name
+  ///
+  /// @essentially is the same as OP_GET_GLOBAL, difference is only in operand size
+  /// @size - 4 bytes
+  OP_GET_GLOBAL_LONG,
+
   /// Bare opcode, takes no operands
   /// @size - 1 byte
   OP_RETURN, 
@@ -164,8 +197,8 @@ void chunk_write(Chunk *chunk, u8 byte, i32 line);
 /// @param chunk pointer to the Chunk to be written to
 /// @param value value to be written
 /// @param line a number of line in the source file where entity represented by byte is located
-/// @return void
-void chunk_write_constant(Chunk *chunk, Value value, i32 line);
+/// @return i32, the index in chunk's constant array, where the constant was appended
+i32 chunk_write_constant(Chunk *chunk, Value value, i32 line);
 
 /// Reads 3 bytes from the Chunk's code array starting from the offset and converts it to the index i32.
 ///

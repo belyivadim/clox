@@ -2,6 +2,11 @@
 
 #include "chunk.h"
 
+/// COLORS
+#define COLOR_FG_RESET "\033[0;37m"
+#define COLOR_FG_CYAN "\033[0;36m"
+#define COLOR_FG_RED "\033[0;31m"
+
 /// Disassembles instructions in the chunk, and prints it to stdout
 ///
 /// @param chunk the Chunk to be disassembled
