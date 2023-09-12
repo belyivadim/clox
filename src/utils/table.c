@@ -3,6 +3,7 @@
 
 #include "memory.h"
 #include "../vm/object.h"
+#include "../vm/value.h"
 #include "table.h"
 
 
@@ -34,6 +35,7 @@ void table_init(Table *table) {
   assert(NULL != table);
   table->count = 0;
   table->capacity = 0;
+  table->tombstones_count = 0;
   table->entries = NULL;
 }
 
@@ -46,7 +48,7 @@ void table_free(Table *table) {
 bool table_set(Table* table, const ObjString *key, Value value) {
   assert(NULL != table);
 
-  if (table->capacity * TABLE_MAX_LOAD <= table->count) {
+  if (table->capacity * TABLE_MAX_LOAD <= table->count + table->tombstones_count) {
     i32 capacity = GROW_CAPACITY(table->capacity);
     adjust_capacity(table, capacity);
   }
@@ -62,18 +64,69 @@ bool table_set(Table* table, const ObjString *key, Value value) {
   return is_new_key;
 }
 
+bool table_get(Table* table, const ObjString *key, Value* value) {
+  assert(NULL != table);
+
+  if (0 == table->count) return false;
+
+  Entry *pentry = find_entry(table->entries, table->capacity, key);
+  if (NULL == pentry->key) return false;
+
+  *value = pentry->value;
+  return true;
+}
+
+bool table_delete(Table *table, const ObjString *key) {
+  assert(NULL != table);
+
+  if (0 == table->count) return false;
+
+  Entry *pentry = find_entry(table->entries, table->capacity, key);
+  if (NULL == pentry->key) return false;
+
+  // tombstone
+  pentry->key = NULL;
+  pentry->value = BOOL_VAL(true);
+  --table->count;
+  ++table->tombstones_count;
+
+  return true;
+}
+
+void table_add_all(Table* dest, const Table *src) {
+  assert(NULL != dest);
+  assert(NULL != src);
+
+  for (i32 i = 0; i < src->capacity; ++i) {
+    const Entry *pentry = src->entries + i;
+    if (NULL != pentry->key) {
+      table_set(dest, pentry->key, pentry->value);
+    }
+  }
+}
+
 
 static Entry *find_entry(Entry* entries, i32 capacity, const ObjString *key) {
   assert(NULL != entries);
   assert(NULL != key);
 
   u32 index = key->hash % capacity;
+  Entry *tombstone = NULL;
 
   for (;;) {
-    Entry *entry = entries + index;
+    Entry *pentry = entries + index;
 
-    if (key == entry->key || NULL == entry->key) {
-      return entry;
+    if (NULL == pentry->key) {
+      if (IS_NIL(pentry->value)) {
+        // empty entry
+        return NULL != tombstone ? tombstone : pentry;
+      } else {
+        // tombstone
+        if (NULL == tombstone) tombstone = pentry;
+      }
+    } else if (key == pentry->key) {
+      // the key is found
+      return pentry;
     }
 
     index = (index + 1) % capacity;
@@ -91,27 +144,18 @@ static void adjust_capacity(Table *table, i32 capacity) {
   }
   
   for (i32 i = 0; i < table->capacity; ++i) {
-    Entry *entry = table->entries + i;
-    if (NULL == entry->key) continue;
+    Entry *pentry = table->entries + i;
+    if (NULL == pentry->key) continue;
 
-    Entry *dest = find_entry(entries, capacity, entry->key);
-    dest->key = entry->key;
-    dest->value = entry->value;
+    Entry *dest = find_entry(entries, capacity, pentry->key);
+    dest->key = pentry->key;
+    dest->value = pentry->value;
   }
 
   FREE_ARRAY(Entry, table->entries, table->capacity);
   table->entries = entries;
   table->capacity = capacity;
+  table->tombstones_count = 0;
 }
 
-void table_add_all(Table* dest, const Table *src) {
-  assert(NULL != dest);
-  assert(NULL != src);
 
-  for (i32 i = 0; i < src->capacity; ++i) {
-    const Entry *entry = src->entries + i;
-    if (NULL != entry->key) {
-      table_set(dest, entry->key, entry->value);
-    }
-  }
-}

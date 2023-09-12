@@ -21,6 +21,9 @@ typedef struct {
   /// Capacity of entries array
   i32 capacity;
 
+  /// Number of tombstones elements in entries array
+  i32 tombstones_count;
+
   /// Array of entries in hashtable
   Entry *entries;
 } Table;
@@ -48,6 +51,21 @@ void table_free(Table *table);
 ///
 /// @return bool, true if key is new, otherwise false
 bool table_set(Table* table, const ObjString *key, Value value);
+
+/// Looks up for a value in the tabel associated with the key
+///
+/// @param table: pointer to the table to look up in
+/// @param key: pointer to the key value associated with
+/// @outparam value: pointer to the found value (untouched if not found)
+/// @return bool, true if value was found, false otherwise
+bool table_get(Table* table, const ObjString *key, Value* value);
+
+/// Deletes entry associated with the key in the table
+///
+/// @param table: pointer to the table to delete from
+/// @param key: pointer to the key value associated with
+/// @return bool, true if entry was found and deleted, false otherwise
+bool table_delete(Table *table, const ObjString *key);
 
 /// Inserts all entries from src to dest
 ///
