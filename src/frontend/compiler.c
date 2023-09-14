@@ -207,6 +207,10 @@ static void string_handler(bool can_assign);
 
 static void variable_handler(bool can_assign);
 
+static void and_handler(bool can_assign);
+static void or_handler(bool can_assign);
+
+
 /// Writes ObjString based on the lexeme in name param as Value to the current chunk's constants array,
 ///   and emits OP_<GET/SET>_GLOBAL* opcode with index of that value
 ///
@@ -371,14 +375,14 @@ ParseRule rules[] = {
   [TOK_IDENTIFIER]    = {variable_handler, NULL, PREC_NONE},
   [TOK_STRING]        = {string_handler, NULL, PREC_NONE},
   [TOK_NUMBER]        = {number_handler, NULL, PREC_NONE},
-  [TOK_AND]           = {NULL, NULL, PREC_NONE},
+  [TOK_AND]           = {NULL, and_handler, PREC_AND},
   [TOK_ELSE]          = {NULL, NULL, PREC_NONE},
   [TOK_FALSE]         = {literal_hanler, NULL, PREC_NONE},
   [TOK_FOR]           = {NULL, NULL, PREC_NONE},
   [TOK_FUN]           = {NULL, NULL, PREC_NONE},
   [TOK_IF]            = {NULL, NULL, PREC_NONE},
   [TOK_NIL]           = {literal_hanler, NULL, PREC_NONE},
-  [TOK_OR]            = {NULL, NULL, PREC_NONE},
+  [TOK_OR]            = {NULL, or_handler, PREC_OR},
   [TOK_PRINT]         = {NULL, NULL, PREC_NONE},
   [TOK_RETURN]        = {NULL, NULL, PREC_NONE},
   [TOK_SUPER]         = {NULL, NULL, PREC_NONE},
@@ -486,6 +490,27 @@ static void if_statement_handler() {
   if (match(TOK_ELSE)) statement_handler();
   patch_jump(else_jump);
 }
+
+static void and_handler(bool can_assign) {
+  i32 end_jump = emit_jump(OP_JUMP_IF_FALSE);
+
+  emit_byte(OP_POP); // pop result of lhs expression from the stack
+  parse_precedence(PREC_AND);
+
+  patch_jump(end_jump);
+}
+
+static void or_handler(bool can_assign) {
+  i32 else_jump = emit_jump(OP_JUMP_IF_FALSE);
+  i32 end_jump = emit_jump(OP_JUMP);
+
+  patch_jump(else_jump);
+  emit_byte(OP_POP);
+
+  parse_precedence(PREC_OR);
+  patch_jump(end_jump);
+}
+
 
 static i32 emit_jump(u8 instruction) {
   emit_byte(instruction);
