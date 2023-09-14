@@ -223,10 +223,11 @@ static void named_variable(const Token *name, bool can_assign);
 static void declaration_handler();
 static void statement_handler();
 static void print_st_handler();
-static void expression_st_hanler();
+static void expr_stmt_hanler();
 static void var_decl_handler();
 static void if_statement_handler();
 static void while_statement_handler();
+static void for_statement_handler();
 
 /// Emits jump instruction with 2 byte placeholder for jump operand
 ///
@@ -446,6 +447,8 @@ static void statement_handler() {
     print_st_handler();
   } else if (match(TOK_IF)) {
     if_statement_handler();
+  } else if (match(TOK_FOR)) {
+    for_statement_handler();
   } else if (match(TOK_WHILE)) {
     while_statement_handler();
   } else if (match(TOK_LEFT_BRACE)) {
@@ -453,7 +456,7 @@ static void statement_handler() {
     block();
     end_scope();
   } else {
-    expression_st_hanler();
+    expr_stmt_hanler();
   }
 }
 
@@ -463,7 +466,7 @@ static void print_st_handler() {
   emit_byte(OP_PRINT);
 }
 
-static void expression_st_hanler() {
+static void expr_stmt_hanler() {
   expression();
   consume(TOK_SEMICOLON, "Expect ';' after value.");
   emit_byte(OP_POP);
@@ -514,6 +517,56 @@ static void while_statement_handler() {
   emit_loop(loop_start);
   patch_jump(exit_jump);
   emit_byte(OP_POP);
+}
+
+static void for_statement_handler() {
+  begin_scope();
+
+  consume(TOK_LEFT_PAREN, "Expect '(' after 'for'.");
+
+  if (match(TOK_SEMICOLON)) {
+    // no initializer
+  } else if (match(TOK_VAR)) {
+    var_decl_handler();
+  } else {
+    expr_stmt_hanler();
+  }
+
+  i32 loop_start = current_chunk()->code_count;
+
+  i32 exit_jump = -1;
+  if (!match(TOK_SEMICOLON)) {
+    expression();
+    consume(TOK_SEMICOLON, "Expect ';' after loop condition");
+
+    // jump out of the loop if the condition is false
+    exit_jump = emit_jump(OP_JUMP_IF_FALSE);
+    emit_byte(OP_POP);
+  }
+
+  if (!match(TOK_RIGHT_PAREN)) {
+    i32 body_jump = emit_jump(OP_JUMP);
+
+    i32 increment_start = current_chunk()->code_count;
+    expression();
+    emit_byte(OP_POP);
+    consume(TOK_RIGHT_PAREN, "Exprect ')' after for clauses");
+
+    emit_loop(loop_start);
+    loop_start = increment_start;
+    patch_jump(body_jump);
+  }
+
+  statement_handler();
+
+  emit_loop(loop_start);
+
+  if (-1 != exit_jump) {
+    patch_jump(exit_jump);
+    emit_byte(OP_POP);
+  }
+
+  end_scope();
 }
 
 static void and_handler(bool can_assign) {
