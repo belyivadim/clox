@@ -329,6 +329,13 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_LOOP: {
+        u16 offset = READ_U16();
+        vm->ip -= offset;
+        SKIP_BYTES(2);
+        break;
+      }
+
       case OP_RETURN:
         return INTERPRET_OK;
     }

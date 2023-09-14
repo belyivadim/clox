@@ -174,6 +174,13 @@ typedef enum {
   /// @size - 3 bytes
   OP_JUMP_IF_FALSE,
 
+  /// Takes 2 (16-bits) byte operand that is offset in bytes 
+  ///   how many bytes to jump backwards to the beginning of the loop
+  ///
+  /// @Interpreting: reads the operand, then decrements VM's ip on the read value
+  /// @size - 3 bytes
+  OP_LOOP,
+
   /// Bare opcode, takes no operands
   /// @size - 1 byte
   OP_RETURN, 

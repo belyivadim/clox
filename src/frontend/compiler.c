@@ -226,6 +226,7 @@ static void print_st_handler();
 static void expression_st_hanler();
 static void var_decl_handler();
 static void if_statement_handler();
+static void while_statement_handler();
 
 /// Emits jump instruction with 2 byte placeholder for jump operand
 ///
@@ -233,6 +234,12 @@ static void if_statement_handler();
 /// @return i32, offset from the beginning of byte code to placeholder
 ///   for operand of emited jump instruction
 static i32 emit_jump(u8 instruction);
+
+/// Emits loop instruction with 2 byte operand
+///
+/// @param loop_start: index in current chunk's code where to jump
+/// @return void
+static void emit_loop(i32 loop_start);
 
 /// Patches jump operand to actual value,
 ///   how many bytes to skip 
@@ -439,6 +446,8 @@ static void statement_handler() {
     print_st_handler();
   } else if (match(TOK_IF)) {
     if_statement_handler();
+  } else if (match(TOK_WHILE)) {
+    while_statement_handler();
   } else if (match(TOK_LEFT_BRACE)) {
     begin_scope();
     block();
@@ -491,7 +500,24 @@ static void if_statement_handler() {
   patch_jump(else_jump);
 }
 
+static void while_statement_handler() {
+  i32 loop_start = current_chunk()->code_count;
+
+  consume(TOK_LEFT_PAREN, "Expect '(' after 'if'.");
+  expression();
+  consume(TOK_RIGHT_PAREN, "Expect ')' after 'if'.");
+
+  i32 exit_jump = emit_jump(OP_JUMP_IF_FALSE);
+  emit_byte(OP_POP);
+  statement_handler();
+
+  emit_loop(loop_start);
+  patch_jump(exit_jump);
+  emit_byte(OP_POP);
+}
+
 static void and_handler(bool can_assign) {
+  (void)can_assign;
   i32 end_jump = emit_jump(OP_JUMP_IF_FALSE);
 
   emit_byte(OP_POP); // pop result of lhs expression from the stack
@@ -501,6 +527,7 @@ static void and_handler(bool can_assign) {
 }
 
 static void or_handler(bool can_assign) {
+  (void)can_assign;
   i32 else_jump = emit_jump(OP_JUMP_IF_FALSE);
   i32 end_jump = emit_jump(OP_JUMP);
 
@@ -529,6 +556,16 @@ static void patch_jump(i32 offset) {
 
   current_chunk()->code[offset] = (jump >> 8) & 0xff;
   current_chunk()->code[offset + 1] = (jump) & 0xff;
+}
+
+static void emit_loop(i32 loop_start) {
+  emit_byte(OP_LOOP);
+
+  i32 offset = current_chunk()->code_count - loop_start + 2;
+  if (offset > U16_MAX) error("Loop body is too large");
+
+  emit_byte((offset >> 8) & 0xff);
+  emit_byte((offset) & 0xff);
 }
 
 static i32 parse_variable(const char *error_msg)  {
