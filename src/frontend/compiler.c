@@ -221,7 +221,21 @@ static void statement_handler();
 static void print_st_handler();
 static void expression_st_hanler();
 static void var_decl_handler();
+static void if_statement_handler();
 
+/// Emits jump instruction with 2 byte placeholder for jump operand
+///
+/// @param instruction: jump instruction
+/// @return i32, offset from the beginning of byte code to placeholder
+///   for operand of emited jump instruction
+static i32 emit_jump(u8 instruction);
+
+/// Patches jump operand to actual value,
+///   how many bytes to skip 
+///
+/// @param offset: offset to the jump operand in current chunk's code
+/// @return void
+static void patch_jump(i32 offset);
 
 /// Begins the new lexical scope
 ///
@@ -419,6 +433,8 @@ static void declaration_handler() {
 static void statement_handler() {
   if (match(TOK_PRINT)) {
     print_st_handler();
+  } else if (match(TOK_IF)) {
+    if_statement_handler();
   } else if (match(TOK_LEFT_BRACE)) {
     begin_scope();
     block();
@@ -454,6 +470,41 @@ static void var_decl_handler() {
   define_variable(global);
 }
 
+static void if_statement_handler() {
+  consume(TOK_LEFT_PAREN, "Expect '(' after 'if'.");
+  expression();
+  consume(TOK_RIGHT_PAREN, "Expect ')' after 'if'.");
+
+  i32 then_jump = emit_jump(OP_JUMP_IF_FALSE);
+  emit_byte(OP_POP); // pop result of condition expression from the stack
+  statement_handler();
+
+  i32 else_jump = emit_jump(OP_JUMP);
+  patch_jump(then_jump);
+  emit_byte(OP_POP); // pop result of condition expression from the stack
+
+  if (match(TOK_ELSE)) statement_handler();
+  patch_jump(else_jump);
+}
+
+static i32 emit_jump(u8 instruction) {
+  emit_byte(instruction);
+  emit_byte(0xff);
+  emit_byte(0xff);
+  return current_chunk()->code_count - 2;
+}
+
+static void patch_jump(i32 offset) {
+  // -2 to adjust for the bytecode for the jump offset itself.
+  i32 jump = current_chunk()->code_count - offset - 2;
+
+  if (jump > U16_MAX) {
+    error("Too much code to jump over.");
+  }
+
+  current_chunk()->code[offset] = (jump >> 8) & 0xff;
+  current_chunk()->code[offset + 1] = (jump) & 0xff;
+}
 
 static i32 parse_variable(const char *error_msg)  {
   consume(TOK_IDENTIFIER, error_msg);

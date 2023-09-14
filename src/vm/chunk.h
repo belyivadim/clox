@@ -161,6 +161,19 @@ typedef enum {
   /// @size - 2 byte
   OP_SET_LOCAL,
 
+  /// Takes 2 (16-bits) byte operand that is offset in bytes how many bytes to jump
+  ///
+  /// @Interpreting: reads the operand, then increments VM's ip on the read value
+  /// @size - 3 bytes
+  OP_JUMP,
+
+  /// Takes 2 (16-bits) byte operand that is offset in bytes how many bytes to jump
+  ///
+  /// @Interpreting: reads the operand, then increments VM's ip on the read value
+  ///   in case if value on top of the VM's stack is falsey
+  /// @size - 3 bytes
+  OP_JUMP_IF_FALSE,
+
   /// Bare opcode, takes no operands
   /// @size - 1 byte
   OP_RETURN, 

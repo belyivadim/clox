@@ -17,5 +17,12 @@ typedef int32_t i32;
 typedef int64_t i64;
 typedef ssize_t isize;
 
+enum {
+  U8_COUNT = UINT8_MAX + 1,
+  U16_MAX = UINT16_MAX
+};
+
+
+
 
 #endif // !__CLOX_DEFS_H__

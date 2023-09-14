@@ -154,6 +154,8 @@ static InterpreterResult vm_run() {
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define READ_STRING_LONG() AS_STRING(READ_CONSTANT_LONG())
 
+#define READ_U16() ((u16)((*vm->ip << 8 | vm->ip[1])))
+
 #define BINARY_OP(value_kind, op) \
   do { \
     if (!IS_NUMBER(*vm_stack_peek(0)) || !IS_NUMBER(*vm_stack_peek(1))) {\
@@ -313,6 +315,20 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_JUMP: {
+        u16 offset = READ_U16();
+        vm->ip += offset;
+        SKIP_BYTES(2);
+        break;
+      }
+
+      case OP_JUMP_IF_FALSE: {
+        u16 offset = READ_U16();
+        vm->ip += is_falsey(*vm_stack_top()) * offset;
+        SKIP_BYTES(2);
+        break;
+      }
+
       case OP_RETURN:
         return INTERPRET_OK;
     }
@@ -321,6 +337,7 @@ static InterpreterResult vm_run() {
 #undef PRINT_DEBUG_INFO
 #undef BINARY_OP
 #undef SKIP_BYTES
+#undef READ_U16
 #undef READ_STRING
 #undef READ_STRING_LONG
 #undef READ_CONSTANT_LONG

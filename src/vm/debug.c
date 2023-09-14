@@ -6,6 +6,7 @@ static i32 simple_instruction(const char *name, i32 offset);
 static i32 constant_instruction(const char *name, const Chunk *chunk, i32 offset);
 static i32 constant_long_instruction(const char *name, const Chunk *chunk, i32 offset);
 static i32 byte_instruction(const char *name, const Chunk *chunk, i32 offset);
+static i32 jump_instruction(const char *name, i32 sign, const Chunk *chunk, i32 offset);
 
 #define DISASSEMBLE_COLOR COLOR_FG_CYAN
 
@@ -95,6 +96,10 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
       return byte_instruction("OP_GET_LOCAL", chunk, offset);
     case OP_SET_LOCAL:
       return byte_instruction("OP_SET_LOCAL", chunk, offset);
+    case OP_JUMP:
+      return jump_instruction("OP_JUMP", 1, chunk, offset);
+    case OP_JUMP_IF_FALSE:
+      return jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;
@@ -137,4 +142,11 @@ static i32 byte_instruction(const char *name, const Chunk *chunk, i32 offset) {
   u8 slot = chunk->code[offset + 1];
   printf(DISASSEMBLE_COLOR "%-16s [%6d]\n" COLOR_FG_RESET, name, slot);
   return offset + 2;
+}
+
+static i32 jump_instruction(const char *name, i32 sign, const Chunk *chunk, i32 offset) {
+  u16 jump = (u16)((chunk->code[offset + 1] << 8) | chunk->code[offset + 2]);
+  printf(DISASSEMBLE_COLOR "%-16s [%6d] -> %d\n" COLOR_FG_RESET,
+          name, offset, offset + 3 + sign * jump);
+  return offset + 3;
 }
