@@ -301,6 +301,18 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_GET_LOCAL: {
+        u8 slot = READ_BYTE();
+        vm_stack_push(vm->stack[slot]);
+        break;
+      }
+
+      case OP_SET_LOCAL: {
+        u8 slot = READ_BYTE();
+        vm->stack[slot] = *vm_stack_top();
+        break;
+      }
+
       case OP_RETURN:
         return INTERPRET_OK;
     }

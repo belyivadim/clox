@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "common.h"
 #include "compiler.h"
@@ -59,9 +60,33 @@ typedef struct {
   Precedence precedence;
 } ParseRule;
 
+/// Represents the local variable at compile time
+typedef struct {
+  /// Name of the local variable
+  Token name;
+
+  /// depth of the scope where a variable is declared
+  i32 depth;
+} Local;
+
+/// Represents a compile time related data
+typedef struct {
+  /// Array of currently defined local variables
+  Local locals[U8_COUNT];
+
+  /// Number of active elements in the locals array
+  i32 local_count;
+
+  /// Current scope deapth
+  i32 scope_depth;
+} Compiler;
+
 
 /// Parser singleton
 Parser parser;
+
+/// pointer to the instance of the currently active compiler
+Compiler *current_compiler = NULL;
 
 /// Represents a pointer to the chunk that is currently compiled
 Chunk *compiling_chunk;
@@ -71,6 +96,17 @@ Chunk *compiling_chunk;
 /// @return Chunk
 static Chunk *current_chunk() {
   return compiling_chunk;
+}
+
+/// Initializes currently active compiler to the compiler param
+///
+/// @param compiler: pointer to the compiler instance, current_compiler should be initialized to,
+///   also sets up all fields of compiler to zeros
+/// @return void
+static void compiler_init(Compiler *compiler) {
+  compiler->local_count = 0;
+  compiler->scope_depth = 0;
+  current_compiler = compiler;
 }
 
 /// Advances the scanner by scanning the next token
@@ -187,6 +223,22 @@ static void expression_st_hanler();
 static void var_decl_handler();
 
 
+/// Begins the new lexical scope
+///
+/// @return void
+static void begin_scope();
+
+/// Ends the last lexical scope, discards all of its locals
+///
+/// @return void
+static void end_scope();
+
+/// Handles block statement
+///
+/// @return void
+static void block();
+
+
 /// Parses variable identintifier.
 ///   Sets parser in panic mode if it cannot parse the variable identintifier,
 ///   and reports an error with the error_msg param
@@ -207,6 +259,45 @@ static i32 identintifier_constant(const Token *name);
 /// @param index: index in current chunk's constants value array 
 /// @return void
 static void emit_opcode_with_constant_param(OpCode opcode, i32 index);
+
+/// Defines global variable if current scope is global, otherwise does nothing
+///
+/// @param global: index of the global variable in the currently compiled chunk's
+///   constants array
+/// @return void
+static void define_variable(i32 global);
+
+/// Declares variable in local scope 
+///   by adding it to the current_compiler's locals.
+/// If current scope is global, does nothing.
+///
+/// @return void
+static void declare_variable();
+
+/// Adds name param to the current_compiler's locals array
+///   with depth of the current depth
+///
+/// @param name: pointer to the Token with the name of the local variable to add
+static void add_local(const Token *name);
+
+/// Resolves local variable, returns index of variable's value on the stack
+///
+/// @param compiler: pointer to the current compiler
+/// @param name: pointer to the token with variable's name
+/// @return i32, index of the variable's value on the stack,
+///   or -1 if not found
+static i32 resolve_local(const Compiler *compiler, const Token *name);
+
+/// Marks currently compiled variable as initialized
+///
+/// @return void
+static void mark_initialized();
+
+/// Compares lexemes in tokens
+///
+/// @param lhs, rhs: tokens to compare
+/// @return bool, true if lexemes are equal, false otherwise
+static bool identifiers_equal(const Token *lhs, const Token *rhs);
 
 
 /// Checks if parser's current token is of the same kind as kind param
@@ -295,6 +386,9 @@ bool compile(const char *source, Chunk *chunk) {
 
   scanner_init(source);
 
+  Compiler compiler;
+  compiler_init(&compiler);
+
   compiling_chunk = chunk;
 
   parser.had_error = false;
@@ -325,6 +419,10 @@ static void declaration_handler() {
 static void statement_handler() {
   if (match(TOK_PRINT)) {
     print_st_handler();
+  } else if (match(TOK_LEFT_BRACE)) {
+    begin_scope();
+    block();
+    end_scope();
   } else {
     expression_st_hanler();
   }
@@ -353,12 +451,16 @@ static void var_decl_handler() {
 
   consume(TOK_SEMICOLON, "Expect ';' after variable declaration");
 
-  emit_opcode_with_constant_param(OP_DEFINE_GLOBAL, global);
+  define_variable(global);
 }
 
 
 static i32 parse_variable(const char *error_msg)  {
   consume(TOK_IDENTIFIER, error_msg);
+
+  declare_variable();
+  if (current_compiler->scope_depth > 0) return -1;
+
   return identintifier_constant(&parser.previous);
 }
 
@@ -376,6 +478,76 @@ static void emit_opcode_with_constant_param(OpCode opcode, i32 index) {
     emit_byte((u8)(index >> 16));
     emit_byte((u8)(index >> 8));
     emit_byte((u8)(index));
+  }
+}
+
+static void define_variable(i32 global) {
+  if (current_compiler->scope_depth > 0) {
+    mark_initialized();
+    return;
+  }
+
+  emit_opcode_with_constant_param(OP_DEFINE_GLOBAL, global);
+}
+
+static void declare_variable() {
+  // global variables are implicitly declared
+  if (current_compiler->scope_depth == 0) return;
+
+  Token *name = &parser.previous;
+
+  for (i32 i = current_compiler->local_count - 1; i >= 0; --i) {
+    Local *local = current_compiler->locals + i;
+
+    if (-1 != local->depth && local->depth < current_compiler->scope_depth) {
+      break;
+    }
+
+    if (identifiers_equal(name, &local->name)) {
+      error("Already variable with this name in this scope.");
+    }
+  }
+
+  add_local(name);
+}
+
+static void add_local(const Token *name) {
+  assert(NULL != current_compiler);
+
+  if (U8_COUNT == current_compiler->local_count) {
+    error("To many local variables in the scope.");
+    return;
+  }
+
+  Local *local = current_compiler->locals + current_compiler->local_count++;
+  local->name = *name;
+  local->depth = -1; // sential value during intializer compilation
+}
+
+static bool identifiers_equal(const Token *lhs, const Token *rhs) {
+  return lhs->length == rhs->length
+        && 0 == memcmp(lhs->start, rhs->start, lhs->length);
+}
+
+static void block() {
+  while (!check(TOK_RIGHT_BRACE) && !check(TOK_EOF)) {
+    declaration_handler();
+  }
+
+  consume(TOK_RIGHT_BRACE, "Expect '}' after block.");
+}
+
+static void begin_scope() {
+  ++current_compiler->scope_depth;
+}
+
+static void end_scope() {
+  --current_compiler->scope_depth;
+
+  while (current_compiler->local_count > 0
+      && current_compiler->locals[current_compiler->local_count - 1].depth > current_compiler->scope_depth) {
+    emit_byte(OP_POP);
+    --current_compiler->local_count;
   }
 }
 
@@ -580,13 +752,44 @@ static void variable_handler(bool can_assign) {
 }
 
 static void named_variable(const Token *name, bool can_assign) {
-  i32 param = identintifier_constant(name);
+  u8 get_op, set_op;
+  i32 param = resolve_local(current_compiler, name); 
+
+  if (-1 != param) {
+    get_op = OP_GET_LOCAL;
+    set_op = OP_SET_LOCAL;
+  } else {
+    param = identintifier_constant(name);
+    get_op = OP_GET_GLOBAL;
+    set_op = OP_SET_GLOBAL;
+  }
+
   if (can_assign && match(TOK_EQUAL)) {
     expression();
-    emit_opcode_with_constant_param(OP_SET_GLOBAL, param);
+    emit_opcode_with_constant_param(set_op, param);
   } else {
-    emit_opcode_with_constant_param(OP_GET_GLOBAL, param);
+    emit_opcode_with_constant_param(get_op, param);
   }
+}
+
+static i32 resolve_local(const Compiler *compiler, const Token *name) {
+  for (i32 i = compiler->local_count - 1; i >= 0; --i) {
+    const Local *local = compiler->locals + i;
+    if (identifiers_equal(name, &local->name)) {
+      if (-1 == local->depth) {
+        error("Can't read local variable in its own initializer.");
+      }
+
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+static void mark_initialized() {
+  current_compiler->locals[current_compiler->local_count - 1].depth
+    = current_compiler->scope_depth;
 }
 
 static void parse_precedence(Precedence precedence) {

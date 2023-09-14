@@ -5,6 +5,7 @@
 static i32 simple_instruction(const char *name, i32 offset);
 static i32 constant_instruction(const char *name, const Chunk *chunk, i32 offset);
 static i32 constant_long_instruction(const char *name, const Chunk *chunk, i32 offset);
+static i32 byte_instruction(const char *name, const Chunk *chunk, i32 offset);
 
 #define DISASSEMBLE_COLOR COLOR_FG_CYAN
 
@@ -90,6 +91,10 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
       return constant_instruction("OP_SET_GLOBAL", chunk, offset);
     case OP_SET_GLOBAL_LONG:
       return constant_long_instruction("OP_SET_GLOBAL_LONG", chunk, offset);
+    case OP_GET_LOCAL:
+      return byte_instruction("OP_GET_LOCAL", chunk, offset);
+    case OP_SET_LOCAL:
+      return byte_instruction("OP_SET_LOCAL", chunk, offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;
@@ -125,5 +130,11 @@ static i32 constant_long_instruction(const char *name, const Chunk *chunk, i32 o
   puts("'" COLOR_FG_RESET);
 
   return offset + 4;
+}
 
+
+static i32 byte_instruction(const char *name, const Chunk *chunk, i32 offset) {
+  u8 slot = chunk->code[offset + 1];
+  printf(DISASSEMBLE_COLOR "%-16s [%6d]\n" COLOR_FG_RESET, name, slot);
+  return offset + 2;
 }

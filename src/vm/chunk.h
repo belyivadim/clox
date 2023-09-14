@@ -147,6 +147,20 @@ typedef enum {
   /// @size - 4 bytes
   OP_SET_GLOBAL_LONG,
 
+  /// Takes 1 byte operand that is index in VM's stack
+  ///   which is pointed to the local variable value
+  ///
+  /// @Interpreting: reads operand, assigns VM's top stack value to VM's stack value at operand 
+  /// @size - 2 byte
+  OP_GET_LOCAL,
+
+  /// Takes 1 byte operand that is index in VM's stack
+  ///   which is pointed to the local variable value
+  ///
+  /// @Interpreting: reads operand, pushes value at that operand on VM's stack onto VM's stack
+  /// @size - 2 byte
+  OP_SET_LOCAL,
+
   /// Bare opcode, takes no operands
   /// @size - 1 byte
   OP_RETURN, 
