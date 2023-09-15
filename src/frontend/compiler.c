@@ -267,6 +267,7 @@ static void if_statement_handler();
 static void while_statement_handler();
 static void for_statement_handler();
 static void fun_decl_handler();
+static void return_statement_handler();
 
 /// Compiles the function
 ///
@@ -493,6 +494,8 @@ static void statement_handler() {
     if_statement_handler();
   } else if (match(TOK_FOR)) {
     for_statement_handler();
+  } else if (match(TOK_RETURN)) {
+    return_statement_handler();
   } else if (match(TOK_WHILE)) {
     while_statement_handler();
   } else if (match(TOK_LEFT_BRACE)) {
@@ -648,6 +651,20 @@ static void function(FunKind fun_kind) {
   // create ObjFunction
   ObjFunction *pfun = end_compiler();
   emit_opcode_with_param(OP_CONSTANT, emit_constant(OBJ_VAL(pfun)));
+}
+
+static void return_statement_handler() {
+  if (FUN_KIND_SCRIPT == current_compiler->fun_kind) {
+    error("Cannot return from top-level code");
+  }
+
+  if (match(TOK_SEMICOLON)) {
+    emit_return();
+  } else {
+    expression();
+    consume(TOK_SEMICOLON, "Expect ';' after return value");
+    emit_byte(OP_RETURN);
+  }
 }
 
 static void and_handler(bool can_assign) {
@@ -904,6 +921,7 @@ static void emit_byte(u8 byte) {
 }
 
 static void emit_return() {
+  emit_byte(OP_NIL);
   emit_byte(OP_RETURN);
 }
 

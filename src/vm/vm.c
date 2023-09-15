@@ -42,7 +42,8 @@ static void concatenate();
 /// 
 /// @param callee: callable Value
 /// @param arg_count: number of arguments being passed
-/// @return bool, true if call and execution have processed successfully,
+/// @return bool, true if call has processed successfully,
+///   and number of argumets is the same as arity
 ///   false otherwise
 static bool vm_call_value(Value callee, i32 arg_count);
 
@@ -50,7 +51,7 @@ static bool vm_call_value(Value callee, i32 arg_count);
 ///
 /// @param pfun: pointer to the called functio
 /// @param arg_count: number of arguments being passed
-/// @return bool, true if execution has processed successfully,
+/// @return bool, true if number of argumets is the same as arity,
 ///   false otherwise
 static bool vm_call(ObjFunction *pfun, i32 arg_count);
 
@@ -361,8 +362,20 @@ static InterpreterResult vm_run() {
         break;
       }
 
-      case OP_RETURN:
-        return INTERPRET_OK;
+      case OP_RETURN: {
+        Value result = vm_stack_pop();
+
+        if (0 == --vm->frame_count) {
+          vm_stack_pop();
+          return INTERPRET_OK;
+        }
+
+        vm->stack_top = frame->slots;
+        vm_stack_push(result);
+
+        frame = vm->frames + vm->frame_count - 1;
+        break;
+      }
     }
   }
 
@@ -425,7 +438,19 @@ static bool vm_call_value(Value callee, i32 arg_count) {
 }
 
 static bool vm_call(ObjFunction *pfun, i32 arg_count) {
+  if (arg_count != pfun->arity) {
+    runtime_error("Expected %d argumnets, but got %d.",
+                  pfun->arity, arg_count);
+    return false;
+  }
+
   Vm *vm = vm_instance();
+
+  if (FRAMES_MAX == vm->frame_count) {
+    runtime_error("Stack overflow.");
+    return false;
+  }
+
   CallFrame *pframe = vm->frames + vm->frame_count++;
   pframe->pfun = pfun;
   pframe->ip = pfun->chunk.code;
@@ -434,27 +459,38 @@ static bool vm_call(ObjFunction *pfun, i32 arg_count) {
   return true;
 }
 
-static void vm_process_return() {
-  value_print(vm_stack_pop());
-  puts("");
-}
-
-
 static void runtime_error(const char *format, ...) {
 #define ERROR_COLOR COLOR_FG_RED
 
   Vm *vm = vm_instance();
-  CallFrame *pframe = vm->frames + vm->frame_count - 1;
 
-  i32 instruction = pframe->ip - pframe->pfun->chunk.code - 1;
-  i32 line = chunk_get_line(&pframe->pfun->chunk, instruction);
-  fprintf(stderr, ERROR_COLOR "[line %d] in script: ", line);
+  //i32 instruction = pframe->ip - pframe->pfun->chunk.code - 1;
+  //i32 line = chunk_get_line(&pframe->pfun->chunk, instruction);
+  //fprintf(stderr, ERROR_COLOR "[line %d] in script: ", line);
 
   va_list args;
   va_start(args, format);
+  fprintf(stderr, ERROR_COLOR);
   vfprintf(stderr, format, args);
   va_end(args);
-  fputs("\n" COLOR_FG_RESET, stderr);
+  fputs("\n", stderr);
+
+  for (i32 i = vm->frame_count - 1; i > 0; --i) {
+    CallFrame *pframe = vm->frames + i;
+    ObjFunction *pfun = pframe->pfun;
+
+    usize instruction = pframe->ip - pfun->chunk.code - 1;
+    i32 line = chunk_get_line(&pfun->chunk, instruction);
+    fprintf(stderr, "[line %d] in ", line);
+
+    if (NULL == pfun->name) {
+      fprintf(stderr, "script\n");
+    } else {
+      fprintf(stderr, "%s()\n", pfun->name->chars);
+    }
+  }
+
+  fprintf(stderr, COLOR_FG_RESET);
   
   vm_stack_reset();
 
