@@ -231,11 +231,23 @@ static void literal_hanler(bool can_assign);
 /// @return void
 static void string_handler(bool can_assign);
 
+/// Handles variable expression
+///
+/// @return void
 static void variable_handler(bool can_assign);
+
+/// Handles call expression
+///
+/// @return void
+static void call_handler(bool can_assign);
 
 static void and_handler(bool can_assign);
 static void or_handler(bool can_assign);
 
+/// Parses argument list for call expression
+///
+/// @return u8, number of arguments
+static u8 argument_list();
 
 /// Writes ObjString based on the lexeme in name param as Value to the current chunk's constants array,
 ///   and emits OP_<GET/SET>_GLOBAL* opcode with index of that value
@@ -395,7 +407,7 @@ static ParseRule *get_rule(TokenKind kind);
 
 /// The table of parse rules
 ParseRule rules[] = {
-  [TOK_LEFT_PAREN]    = {grouping_handler, NULL, PREC_NONE},
+  [TOK_LEFT_PAREN]    = {grouping_handler, call_handler, PREC_CALL},
   [TOK_RIGHT_PAREN]   = {NULL, NULL, PREC_NONE},
   [TOK_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
   [TOK_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
@@ -986,6 +998,31 @@ static void string_handler(bool can_assign) {
   // emits string literal with trimed quotes
   emit_constant(OBJ_VAL(string_copy(parser.previous.start + 1,
                                     parser.previous.length - 2)));
+}
+
+static void call_handler(bool can_assign) {
+  (void)can_assign;
+  u8 arg_count = argument_list();
+  emit_opcode_with_param(OP_CALL, arg_count);
+}
+
+static u8 argument_list() {
+  u8 arg_count = 0;
+
+  if (!check(TOK_RIGHT_PAREN)) {
+    do {
+      expression();
+
+      if (255 == arg_count) {
+        error("Can't have more than 255 arguments.");
+      }
+
+      ++arg_count;
+    } while (match(TOK_COMMA));
+  }
+
+  consume(TOK_RIGHT_PAREN, "Expect ')' after arguments.");
+  return arg_count;
 }
 
 static void variable_handler(bool can_assign) {

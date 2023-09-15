@@ -38,6 +38,22 @@ static void runtime_error(const char *format, ...);
 /// @return void
 static void concatenate();
 
+/// Calls the callee by allocating new frame onto the VM's frames
+/// 
+/// @param callee: callable Value
+/// @param arg_count: number of arguments being passed
+/// @return bool, true if call and execution have processed successfully,
+///   false otherwise
+static bool vm_call_value(Value callee, i32 arg_count);
+
+/// Calls function by allocating new frame onto the VM's frames
+///
+/// @param pfun: pointer to the called functio
+/// @param arg_count: number of arguments being passed
+/// @return bool, true if execution has processed successfully,
+///   false otherwise
+static bool vm_call(ObjFunction *pfun, i32 arg_count);
+
 static InterpreterResult vm_run();
 static void vm_process_constant(Value constant);
 static void vm_process_define_global(const ObjString *name);
@@ -132,6 +148,9 @@ InterpreterResult vm_interpret(const char *source) {
   pframe->pfun = pfun;
   pframe->ip = pfun->chunk.code;
   pframe->slots = vm->stack;
+
+  vm_stack_push(OBJ_VAL(pfun));
+  vm_call_value(OBJ_VAL(pfun), 0);
   
   return vm_run();
 }
@@ -333,6 +352,15 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_CALL: {
+        i32 arg_count = READ_BYTE();
+        if (!vm_call_value(*vm_stack_peek(arg_count), arg_count)) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        frame = vm->frames + vm->frame_count - 1;
+        break;
+      }
+
       case OP_RETURN:
         return INTERPRET_OK;
     }
@@ -379,6 +407,31 @@ static InterpreterResult vm_process_set_global(const ObjString *name) {
     return INTERPRETER_RUNTUME_ERROR;
   }
   return INTERPRET_OK;
+}
+
+static bool vm_call_value(Value callee, i32 arg_count) {
+  if (IS_OBJ(callee)) {
+    switch (OBJ_KIND(callee)) {
+      case OBJ_FUNCTION:
+        return vm_call(AS_FUNCTION(callee), arg_count);
+
+      default:
+        break; // non-callable object
+    }
+  }
+
+  runtime_error("Can only call functions and classes.");
+  return false;
+}
+
+static bool vm_call(ObjFunction *pfun, i32 arg_count) {
+  Vm *vm = vm_instance();
+  CallFrame *pframe = vm->frames + vm->frame_count++;
+  pframe->pfun = pfun;
+  pframe->ip = pfun->chunk.code;
+
+  pframe->slots = vm->stack_top - arg_count - 1;
+  return true;
 }
 
 static void vm_process_return() {

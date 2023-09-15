@@ -181,6 +181,12 @@ typedef enum {
   /// @size - 3 bytes
   OP_LOOP,
 
+  /// Takes 1 byte operand that is number of arguments being passed
+  ///
+  /// @Interpreting: 
+  /// @size = 2 bytes
+  OP_CALL,
+
   /// Bare opcode, takes no operands
   /// @size - 1 byte
   OP_RETURN, 

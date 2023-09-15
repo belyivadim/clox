@@ -102,6 +102,8 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
       return jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
     case OP_LOOP:
       return jump_instruction("OP_LOOP", -1, chunk, offset);
+    case OP_CALL:
+      return byte_instruction("OP_CALL", chunk, offset);
     default:
       printf("Unknown opcode %d\n", instruction);
       return offset + 1;
