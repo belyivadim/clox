@@ -75,7 +75,10 @@ typedef enum {
 } FunKind;
 
 /// Represents a compile time related data
-typedef struct {
+typedef struct Compiler {
+  /// Enclosing compiler
+  struct Compiler *penclosing;
+
   /// Currently compiled function
   ObjFunction *pfun;
 
@@ -112,11 +115,17 @@ static Chunk *current_chunk() {
 ///   also sets up all fields of compiler to zeros
 /// @return void
 static void compiler_init(Compiler *compiler, FunKind fun_kind) {
+  compiler->penclosing = current_compiler;
   compiler->fun_kind = fun_kind;
   compiler->local_count = 0;
   compiler->scope_depth = 0;
   compiler->pfun = function_create();
   current_compiler = compiler;
+
+  if (FUN_KIND_SCRIPT != fun_kind) {
+    current_compiler->pfun->name
+      = string_copy(parser.previous.start, parser.previous.length);
+  }
 
   // implicitly claim stack slot 0 for the VM's own internal use
   // with name of an empty string, so user cannot refer to it
@@ -245,6 +254,13 @@ static void var_decl_handler();
 static void if_statement_handler();
 static void while_statement_handler();
 static void for_statement_handler();
+static void fun_decl_handler();
+
+/// Compiles the function
+///
+/// @param fun_kind: kind of the function to complie
+/// @return void
+static void function(FunKind fun_kind);
 
 /// Emits jump instruction with 2 byte placeholder for jump operand
 ///
@@ -299,9 +315,9 @@ static i32 identintifier_constant(const Token *name);
 /// Emits VM's opcode with the name with index param
 ///   where index param is index of constant value in the current chunk's constants array
 ///
-/// @param index: index in current chunk's constants value array 
+/// @param param: param up to 24-bits
 /// @return void
-static void emit_opcode_with_constant_param(OpCode opcode, i32 index);
+static void emit_opcode_with_param(OpCode opcode, i32 param);
 
 /// Defines global variable if current scope is global, otherwise does nothing
 ///
@@ -445,7 +461,9 @@ ObjFunction *compile(const char *source) {
 }
 
 static void declaration_handler() {
-  if (match(TOK_VAR)) {
+  if (match(TOK_FUN)) {
+    fun_decl_handler();
+  } else if (match(TOK_VAR)) {
     var_decl_handler();
   } else {
     statement_handler();
@@ -583,6 +601,43 @@ static void for_statement_handler() {
   end_scope();
 }
 
+static void fun_decl_handler() {
+  i32 global = parse_variable("Expect function name.");
+  mark_initialized();
+  function(FUN_KIND_FUNCTION);
+  define_variable(global);
+}
+
+static void function(FunKind fun_kind) {
+  Compiler compiler;
+  compiler_init(&compiler, fun_kind);
+  begin_scope();
+
+  // param list
+  consume(TOK_LEFT_PAREN, "Expect '(' after function name.");
+
+  if (!check(TOK_RIGHT_PAREN)) {
+    do {
+      if (++current_compiler->pfun->arity > 255) {
+        error_at_current("Cannot have more than 255 parameters.");
+      }
+
+      i32 param_constant = parse_variable("Expect parameter name.");
+      define_variable(param_constant);
+    } while (match(TOK_COMMA));
+  }
+
+  consume(TOK_RIGHT_PAREN, "Expect ')' after function name.");
+
+  // body
+  consume(TOK_LEFT_BRACE, "Expect '{' before function body.");
+  block();
+
+  // create ObjFunction
+  ObjFunction *pfun = end_compiler();
+  emit_opcode_with_param(OP_CONSTANT, emit_constant(OBJ_VAL(pfun)));
+}
+
 static void and_handler(bool can_assign) {
   (void)can_assign;
   i32 end_jump = emit_jump(OP_JUMP_IF_FALSE);
@@ -649,15 +704,15 @@ static i32 identintifier_constant(const Token *name) {
   return chunk_add_constant(current_chunk(), OBJ_VAL(string_copy(name->start, name->length)));
 }
 
-static void emit_opcode_with_constant_param(OpCode opcode, i32 index) {
-  if (index < 256) {
+static void emit_opcode_with_param(OpCode opcode, i32 param) {
+  if (param < 256) {
     emit_byte(opcode);
-    emit_byte((u8)index);
+    emit_byte((u8)param);
   } else {
     emit_byte((OpCode)(opcode + 1));
-    emit_byte((u8)(index >> 16));
-    emit_byte((u8)(index >> 8));
-    emit_byte((u8)(index));
+    emit_byte((u8)(param >> 16));
+    emit_byte((u8)(param >> 8));
+    emit_byte((u8)(param));
   }
 }
 
@@ -667,7 +722,7 @@ static void define_variable(i32 global) {
     return;
   }
 
-  emit_opcode_with_constant_param(OP_DEFINE_GLOBAL, global);
+  emit_opcode_with_param(OP_DEFINE_GLOBAL, global);
 }
 
 static void declare_variable() {
@@ -828,6 +883,7 @@ static ObjFunction* end_compiler() {
   }
 #endif // !DEBUG_PRINT_CODE
 
+  current_compiler = current_compiler->penclosing;
   return pfun;
 }
 
@@ -951,9 +1007,9 @@ static void named_variable(const Token *name, bool can_assign) {
 
   if (can_assign && match(TOK_EQUAL)) {
     expression();
-    emit_opcode_with_constant_param(set_op, param);
+    emit_opcode_with_param(set_op, param);
   } else {
-    emit_opcode_with_constant_param(get_op, param);
+    emit_opcode_with_param(get_op, param);
   }
 }
 
@@ -973,6 +1029,8 @@ static i32 resolve_local(const Compiler *compiler, const Token *name) {
 }
 
 static void mark_initialized() {
+  if (0 == current_compiler->scope_depth) return;
+
   current_compiler->locals[current_compiler->local_count - 1].depth
     = current_compiler->scope_depth;
 }

@@ -43,7 +43,7 @@ typedef struct {
   Chunk chunk;
 
   /// Name of the function
-  ObjString *name;
+  const ObjString *name;
 
   /// Number of parameters the function expects
   i32 arity;
