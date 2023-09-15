@@ -3,14 +3,17 @@
 
 #include "common.h"
 #include "value.h"
+#include "vm/chunk.h"
 
 /// Object's kind getter
 #define OBJ_KIND(v)       (AS_OBJ(v)->kind)
 
 /// Object's kind identifiers
+#define IS_FUNCTION(v)    is_obj_kind(v, OBJ_FUNCTION)
 #define IS_STRING(v)      is_obj_kind(v, OBJ_STRING)
 
 /// Object's accessors
+#define AS_FUNCTION(v)    ((ObjFunction*)AS_OBJ(v))
 #define AS_STRING(v)      ((ObjString*)AS_OBJ(v))
 #define AS_CSTRING(v)     (((ObjString*)AS_OBJ(v))->chars)
 
@@ -18,6 +21,7 @@
 
 /// Represents all the possible tags of object types
 typedef enum {
+  OBJ_FUNCTION,
   OBJ_STRING
 } ObjKind;
 
@@ -29,6 +33,21 @@ struct Obj {
   /// Pointer to the next heap allocated object
   struct Obj *next;
 };
+
+/// Represents first class function in Lox
+typedef struct {
+  /// Object field
+  Obj obj;
+
+  /// Chunk of body of the function
+  Chunk chunk;
+
+  /// Name of the function
+  ObjString *name;
+
+  /// Number of parameters the function expects
+  i32 arity;
+} ObjFunction;
 
 /// Represents clox string object
 struct ObjString {
@@ -71,6 +90,12 @@ const ObjString *string_copy(const char *chars, u32 length);
 /// @param length: a length of the array
 /// @return ObjString*, pointer to the newly allocated string object
 const ObjString *string_create(char *chars, u32 length);
+
+/// Creates new function object with 0 initialized fields
+///
+/// @return ObjFunction*, pointer to the newly allocated function,
+///   passes ownership to the caller
+ObjFunction *function_create();
 
 /// Prints the value param as an object
 ///

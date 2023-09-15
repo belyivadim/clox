@@ -45,5 +45,12 @@ static void object_free(Obj *pobj) {
       FREE(ObjString, pobj);
       break;
     }
+
+    case OBJ_FUNCTION: {
+      ObjFunction *pfun = (ObjFunction*)pobj;
+      chunk_free(&pfun->chunk);
+      FREE(ObjFunction, pobj);
+      break;
+    }
   }
 }

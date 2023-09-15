@@ -2,21 +2,35 @@
 #define __CLOX_VM_H__
 
 #include "chunk.h"
+#include "object.h"
 #include "../utils/table.h"
 
 enum {
-  STACK_MAX = 1024
+  FRAMES_MAX = 64,
+  STACK_MAX = FRAMES_MAX * U8_COUNT
 };
+
+/// Represents frame of the call stack
+typedef struct {
+  /// Pointer to the function being called
+  ObjFunction *pfun;
+
+  /// Instruction pointer of the caller
+  ///   VM will jump to this instruction after return
+  u8 *ip;
+
+  /// Pointer to the first slot into the VM's value stack
+  Value *slots;
+} CallFrame;
 
 /// Represents virtual machine that interprets byte code
 typedef struct {
-  /// pointer to the Chunk to be interpreted
-  Chunk *chunk;
+  /// Call frame stack
+  CallFrame frames[FRAMES_MAX];
 
-  /// pointer to the current instruction
-  u8 *ip;
-
-
+  /// Number of active elements in the call frame stack
+  i32 frame_count;
+  
   /// VM's stack for storing the Values
   Value stack[STACK_MAX];
 

@@ -69,8 +69,19 @@ typedef struct {
   i32 depth;
 } Local;
 
+typedef enum {
+  FUN_KIND_FUNCTION,
+  FUN_KIND_SCRIPT
+} FunKind;
+
 /// Represents a compile time related data
 typedef struct {
+  /// Currently compiled function
+  ObjFunction *pfun;
+
+  /// Kind of the currently compiled function
+  FunKind fun_kind;
+
   /// Array of currently defined local variables
   Local locals[U8_COUNT];
 
@@ -88,14 +99,11 @@ Parser parser;
 /// pointer to the instance of the currently active compiler
 Compiler *current_compiler = NULL;
 
-/// Represents a pointer to the chunk that is currently compiled
-Chunk *compiling_chunk;
-
 /// The getter for the chunk that is currently being compiled
 ///
-/// @return Chunk
+/// @return Chunk*
 static Chunk *current_chunk() {
-  return compiling_chunk;
+  return &current_compiler->pfun->chunk;
 }
 
 /// Initializes currently active compiler to the compiler param
@@ -103,10 +111,19 @@ static Chunk *current_chunk() {
 /// @param compiler: pointer to the compiler instance, current_compiler should be initialized to,
 ///   also sets up all fields of compiler to zeros
 /// @return void
-static void compiler_init(Compiler *compiler) {
+static void compiler_init(Compiler *compiler, FunKind fun_kind) {
+  compiler->fun_kind = fun_kind;
   compiler->local_count = 0;
   compiler->scope_depth = 0;
+  compiler->pfun = function_create();
   current_compiler = compiler;
+
+  // implicitly claim stack slot 0 for the VM's own internal use
+  // with name of an empty string, so user cannot refer to it
+  Local *local = current_compiler->locals + current_compiler->local_count++;
+  local->depth = 0;
+  local->name.start = "";
+  local->name.length = 0;
 }
 
 /// Advances the scanner by scanning the next token
@@ -143,8 +160,8 @@ static void consume(TokenKind kind, const char *message);
 
 /// Ends the compilation process
 ///
-/// @return void
-static void end_compiler();
+/// @return ObjFunction*, pointer to the compiled function 
+static ObjFunction* end_compiler();
 
 /// Reports to stderr that an error has been occured at the current token
 ///
@@ -406,16 +423,13 @@ ParseRule rules[] = {
 
 
 
-bool compile(const char *source, Chunk *chunk) {
+ObjFunction *compile(const char *source) {
   assert(NULL != source);
-  assert(NULL != chunk);
 
   scanner_init(source);
 
   Compiler compiler;
-  compiler_init(&compiler);
-
-  compiling_chunk = chunk;
+  compiler_init(&compiler, FUN_KIND_SCRIPT);
 
   parser.had_error = false;
   parser.panic_mode = false;
@@ -425,9 +439,9 @@ bool compile(const char *source, Chunk *chunk) {
     declaration_handler();
   }
 
-  end_compiler();
+  ObjFunction *pfun = end_compiler();
 
-  return !parser.had_error;
+  return parser.had_error ? NULL : pfun;
 }
 
 static void declaration_handler() {
@@ -803,13 +817,18 @@ static void consume(TokenKind kind, const char *message) {
   error_at_current(message);
 }
 
-static void end_compiler() {
+static ObjFunction* end_compiler() {
   emit_return();
+  ObjFunction *pfun = current_compiler->pfun;
+
 #ifdef DEBUG_PRINT_CODE
   if (!parser.had_error) {
-    chunk_disassemble(current_chunk(), "code");
+    chunk_disassemble(current_chunk(), 
+                      NULL != pfun->name ? pfun->name->chars : "<script>");
   }
 #endif // !DEBUG_PRINT_CODE
+
+  return pfun;
 }
 
 static void emit_byte(u8 byte) {

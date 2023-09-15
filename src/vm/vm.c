@@ -96,6 +96,7 @@ static Value* vm_stack_top() {
 static void vm_stack_reset() {
   Vm *vm = vm_instance();
   vm->stack_top = vm->stack;
+  vm->frame_count = 0;
 }
 
 static bool is_falsey(Value value) {
@@ -121,40 +122,35 @@ static void concatenate() {
 InterpreterResult vm_interpret(const char *source) {
   assert(NULL != source);
 
-  Chunk chunk;
-  chunk_init(&chunk);
-
-  if (!compile(source, &chunk)) {
-    chunk_free(&chunk);
-    return INTERPRET_COMPILE_ERROR;
-  }
+  ObjFunction *pfun = compile(source);
+  if (NULL == pfun) return INTERPRET_COMPILE_ERROR;
 
   Vm *vm = vm_instance();
-  vm->chunk = &chunk;
-  vm->ip = vm->chunk->code;
-
-  InterpreterResult result = vm_run();
-
-  chunk_free(&chunk);
-
-  return result;
+  
+  vm_stack_push(OBJ_VAL(pfun));
+  CallFrame *pframe = vm->frames + vm->frame_count++;
+  pframe->pfun = pfun;
+  pframe->ip = pfun->chunk.code;
+  pframe->slots = vm->stack;
+  
+  return vm_run();
 }
 
 
 static InterpreterResult vm_run() {
-#define OFFSET() (vm->ip - vm->chunk->code)
-#define READ_BYTE() (*vm->ip++)
-#define READ_CONSTANT() (vm->chunk->constants.values[READ_BYTE()])
+#define OFFSET() (frame->ip - frame->pfun->chunk.code)
+#define READ_BYTE() (*frame->ip++)
+#define READ_CONSTANT() (frame->pfun->chunk.constants.values[READ_BYTE()])
 #define READ_CONSTANT_LONG() \
-  (vm->chunk->constants.values[\
-    chunk_get_constant_long_index(vm->chunk, OFFSET())\
+  (frame->pfun->chunk.constants.values[\
+    chunk_get_constant_long_index(&frame->pfun->chunk, OFFSET())\
   ])
-#define SKIP_BYTES(n) (vm->ip += (n))
+#define SKIP_BYTES(n) (frame->ip += (n))
 
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define READ_STRING_LONG() AS_STRING(READ_CONSTANT_LONG())
 
-#define READ_U16() ((u16)((*vm->ip << 8 | vm->ip[1])))
+#define READ_U16() ((u16)((*frame->ip << 8 | frame->ip[1])))
 
 #define BINARY_OP(value_kind, op) \
   do { \
@@ -177,7 +173,7 @@ static InterpreterResult vm_run() {
       printf(" )"); \
     } \
     puts(""); \
-    chunk_disassemble_instruction(vm->chunk, OFFSET()); \
+    chunk_disassemble_instruction(&frame->pfun->chunk, OFFSET());\
   } while (0)
 #else
 #define PRINT_DEBUG_INFO() (void)0
@@ -185,6 +181,7 @@ static InterpreterResult vm_run() {
 
   // function body starts here
   Vm *vm = vm_instance();
+  CallFrame *frame = vm->frames + vm->frame_count - 1;
   for (;;) {
     PRINT_DEBUG_INFO();
     u8 instruction;
@@ -305,33 +302,33 @@ static InterpreterResult vm_run() {
 
       case OP_GET_LOCAL: {
         u8 slot = READ_BYTE();
-        vm_stack_push(vm->stack[slot]);
+        vm_stack_push(frame->slots[slot]);
         break;
       }
 
       case OP_SET_LOCAL: {
         u8 slot = READ_BYTE();
-        vm->stack[slot] = *vm_stack_top();
+        frame->slots[slot] = *vm_stack_top();
         break;
       }
 
       case OP_JUMP: {
         u16 offset = READ_U16();
-        vm->ip += offset;
+        frame->ip += offset;
         SKIP_BYTES(2);
         break;
       }
 
       case OP_JUMP_IF_FALSE: {
         u16 offset = READ_U16();
-        vm->ip += is_falsey(*vm_stack_top()) * offset;
+        frame->ip += is_falsey(*vm_stack_top()) * offset;
         SKIP_BYTES(2);
         break;
       }
 
       case OP_LOOP: {
         u16 offset = READ_U16();
-        vm->ip -= offset;
+        frame->ip -= offset;
         SKIP_BYTES(2);
         break;
       }
@@ -394,8 +391,10 @@ static void runtime_error(const char *format, ...) {
 #define ERROR_COLOR COLOR_FG_RED
 
   Vm *vm = vm_instance();
-  i32 instruction = vm->ip - vm->chunk->code - 1;
-  i32 line = chunk_get_line(vm->chunk, instruction);
+  CallFrame *pframe = vm->frames + vm->frame_count - 1;
+
+  i32 instruction = pframe->ip - pframe->pfun->chunk.code - 1;
+  i32 line = chunk_get_line(&pframe->pfun->chunk, instruction);
   fprintf(stderr, ERROR_COLOR "[line %d] in script: ", line);
 
   va_list args;

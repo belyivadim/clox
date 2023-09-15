@@ -26,6 +26,8 @@ static Obj* object_allocate(usize size, ObjKind kind);
 
 static u32 string_hash(const char *key, u32 length);
 
+static void function_print(const ObjFunction *pfun);
+
 const ObjString *string_copy(const char *chars, u32 length) {
   u32 hash = string_hash(chars, length);
 
@@ -90,10 +92,40 @@ static Obj* object_allocate(usize size, ObjKind kind) {
   return pobj;
 }
 
+static void function_print(const ObjFunction *pfun) {
+  assert(NULL != pfun);
+
+  if (NULL == pfun->name) {
+    printf("<script>");
+    return;
+  }
+
+  printf("<fun %s>", pfun->name->chars);
+}
+
+ObjFunction *function_create() {
+  ObjFunction *pfun = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
+
+  pfun->arity = 0;
+  pfun->name = NULL;
+  chunk_init(&pfun->chunk);
+  
+  return pfun;
+}
+
 void object_print(Value value) {
   switch (OBJ_KIND(value)) {
-    case OBJ_STRING:
+    case OBJ_STRING: {
       printf("%s", AS_CSTRING(value));
       break;
+    }
+
+    case OBJ_FUNCTION: {
+      function_print(AS_FUNCTION(value));
+      break;
+    }
   }
 }
+
+
+
