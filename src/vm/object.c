@@ -132,9 +132,10 @@ void object_print(Value value) {
   }
 }
 
-ObjNative *native_create(NativeFn pfun) {
+ObjNative *native_create(NativeFn pfun, i32 arity) {
   ObjNative *pnative = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
   pnative->pfun = pfun;
+  pnative->arity = arity;
   return pnative;
 }
 

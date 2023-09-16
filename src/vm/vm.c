@@ -64,8 +64,9 @@ static bool vm_call(ObjFunction *pfun, i32 arg_count);
 ///   native function's name
 /// @param pfun: pointer to the function that will be called
 ///   by calling native function
+/// @param arity: number of arguments pfun expects
 /// @return void
-static void native_define(const char *name, NativeFn pfun);
+static void native_define(const char *name, NativeFn pfun, i32 arity);
 
 static InterpreterResult vm_run();
 static void vm_process_constant(Value constant);
@@ -86,8 +87,8 @@ void vm_init() {
   table_init(&vm->globals);
   table_init(&vm->strings);
 
-  native_define("clock", clock_native);
-  native_define("readln", readln_native);
+  native_define("clock", clock_native, 0);
+  native_define("readln", readln_native, 0);
 }
 
 void vm_free() {
@@ -436,6 +437,13 @@ static bool vm_call_value(Value callee, i32 arg_count) {
         return vm_call(AS_FUNCTION(callee), arg_count);
 
       case OBJ_NATIVE: {
+        i32 arity = AS_NATIVE_OBJ(callee)->arity; 
+        if (arity != arg_count) {
+          runtime_error("Expected %d argumnets, but got %d.",
+                        arity, arg_count);
+          return false;
+        }
+
         Vm *vm = vm_instance();
         NativeFn native = AS_NATIVE(callee);
         Value result = native(arg_count, vm->stack_top - arg_count);
@@ -475,10 +483,10 @@ static bool vm_call(ObjFunction *pfun, i32 arg_count) {
   return true;
 }
 
-static void native_define(const char *name, NativeFn pfun) {
+static void native_define(const char *name, NativeFn pfun, i32 arity) {
   Vm *vm = vm_instance();
   vm_stack_push(OBJ_VAL(string_copy(name, (i32)strlen(name))));
-  vm_stack_push(OBJ_VAL(native_create(pfun)));
+  vm_stack_push(OBJ_VAL(native_create(pfun, arity)));
   table_set(&vm->globals, AS_STRING(*vm_stack_peek(1)), *vm_stack_top());
   vm_stack_pop();
   vm_stack_pop();

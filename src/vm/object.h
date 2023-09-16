@@ -16,6 +16,7 @@
 /// Object's accessors
 #define AS_FUNCTION(v)    ((ObjFunction*)AS_OBJ(v))
 #define AS_NATIVE(v)      (((ObjNative*)AS_OBJ(v))->pfun)
+#define AS_NATIVE_OBJ(v)  ((ObjNative*)AS_OBJ(v))
 #define AS_STRING(v)      ((ObjString*)AS_OBJ(v))
 #define AS_CSTRING(v)     (((ObjString*)AS_OBJ(v))->chars)
 
@@ -66,6 +67,9 @@ typedef struct {
 
   /// Pointer to the native function
   NativeFn pfun;
+
+  /// Number of parameters the function expects
+  i32 arity;
 } ObjNative;
 
 /// Represents clox string object
@@ -120,9 +124,10 @@ ObjFunction *function_create();
 ///
 /// @param pfun: pointer to the function that will be called
 ///   by call to native function
+/// @param arity: number of arguments pfun expects
 /// @return ObjNative*, pointer to the newly allocated ObjNative,
 ///   passes ownership to the caller
-ObjNative *native_create(NativeFn pfun);
+ObjNative *native_create(NativeFn pfun, i32 arity);
 
 /// Prints the value param as an object
 ///
