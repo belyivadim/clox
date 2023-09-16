@@ -7,7 +7,9 @@
 #include "../frontend/compiler.h"
 #include "../utils/memory.h"
 #include "object.h"
+
 #include "native/native_time.h"
+#include "native/native_io.h"
 
 static void vm_stack_reset();
 
@@ -85,6 +87,7 @@ void vm_init() {
   table_init(&vm->strings);
 
   native_define("clock", clock_native);
+  native_define("readln", readln_native);
 }
 
 void vm_free() {
@@ -154,8 +157,6 @@ InterpreterResult vm_interpret(const char *source) {
   ObjFunction *pfun = compile(source);
   if (NULL == pfun) return INTERPRET_COMPILE_ERROR;
 
-  Vm *vm = vm_instance();
-  
   vm_stack_push(OBJ_VAL(pfun));
   vm_call_value(OBJ_VAL(pfun), 0);
   
