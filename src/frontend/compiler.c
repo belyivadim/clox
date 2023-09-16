@@ -9,9 +9,7 @@
 #include "vm/chunk.h"
 #include "../vm/object.h"
 
-#ifdef DEBUG_PRINT_CODE
 #include "../vm/debug.h"
-#endif // !DEBUG_PRINT_CODE
 
 /// Represent the Token Parser
 typedef struct {

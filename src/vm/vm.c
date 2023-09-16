@@ -7,6 +7,7 @@
 #include "../frontend/compiler.h"
 #include "../utils/memory.h"
 #include "object.h"
+#include "native/native_time.h"
 
 static void vm_stack_reset();
 
@@ -55,6 +56,15 @@ static bool vm_call_value(Value callee, i32 arg_count);
 ///   false otherwise
 static bool vm_call(ObjFunction *pfun, i32 arg_count);
 
+/// Defines native function in the global namespace
+///
+/// @param name: pointer to the c-string that represents 
+///   native function's name
+/// @param pfun: pointer to the function that will be called
+///   by calling native function
+/// @return void
+static void native_define(const char *name, NativeFn pfun);
+
 static InterpreterResult vm_run();
 static void vm_process_constant(Value constant);
 static void vm_process_define_global(const ObjString *name);
@@ -73,6 +83,8 @@ void vm_init() {
   vm->objects = NULL;
   table_init(&vm->globals);
   table_init(&vm->strings);
+
+  native_define("clock", clock_native);
 }
 
 void vm_free() {
@@ -144,12 +156,6 @@ InterpreterResult vm_interpret(const char *source) {
 
   Vm *vm = vm_instance();
   
-  vm_stack_push(OBJ_VAL(pfun));
-  CallFrame *pframe = vm->frames + vm->frame_count++;
-  pframe->pfun = pfun;
-  pframe->ip = pfun->chunk.code;
-  pframe->slots = vm->stack;
-
   vm_stack_push(OBJ_VAL(pfun));
   vm_call_value(OBJ_VAL(pfun), 0);
   
@@ -428,6 +434,15 @@ static bool vm_call_value(Value callee, i32 arg_count) {
       case OBJ_FUNCTION:
         return vm_call(AS_FUNCTION(callee), arg_count);
 
+      case OBJ_NATIVE: {
+        Vm *vm = vm_instance();
+        NativeFn native = AS_NATIVE(callee);
+        Value result = native(arg_count, vm->stack_top - arg_count);
+        vm->stack_top -= arg_count + 1;
+        vm_stack_push(result);
+        return true;
+      }
+
       default:
         break; // non-callable object
     }
@@ -457,6 +472,15 @@ static bool vm_call(ObjFunction *pfun, i32 arg_count) {
 
   pframe->slots = vm->stack_top - arg_count - 1;
   return true;
+}
+
+static void native_define(const char *name, NativeFn pfun) {
+  Vm *vm = vm_instance();
+  vm_stack_push(OBJ_VAL(string_copy(name, (i32)strlen(name))));
+  vm_stack_push(OBJ_VAL(native_create(pfun)));
+  table_set(&vm->globals, AS_STRING(*vm_stack_peek(1)), *vm_stack_top());
+  vm_stack_pop();
+  vm_stack_pop();
 }
 
 static void runtime_error(const char *format, ...) {

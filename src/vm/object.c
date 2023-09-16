@@ -120,6 +120,11 @@ void object_print(Value value) {
       break;
     }
 
+    case OBJ_NATIVE: {
+      printf("<native fun>");
+      break;
+    }
+
     case OBJ_FUNCTION: {
       function_print(AS_FUNCTION(value));
       break;
@@ -127,5 +132,9 @@ void object_print(Value value) {
   }
 }
 
-
+ObjNative *native_create(NativeFn pfun) {
+  ObjNative *pnative = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
+  pnative->pfun = pfun;
+  return pnative;
+}
 

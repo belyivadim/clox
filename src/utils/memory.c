@@ -46,6 +46,11 @@ static void object_free(Obj *pobj) {
       break;
     }
 
+    case OBJ_NATIVE: {
+      FREE(ObjNative, pobj);
+      break;
+    }
+
     case OBJ_FUNCTION: {
       ObjFunction *pfun = (ObjFunction*)pobj;
       chunk_free(&pfun->chunk);
