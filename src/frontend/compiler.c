@@ -65,6 +65,9 @@ typedef struct {
 
   /// depth of the scope where a variable is declared
   i32 depth;
+
+  /// tracks if variable is captured by a closure
+  bool is_captured;
 } Local;
 
 typedef struct {
@@ -137,6 +140,7 @@ static void compiler_init(Compiler *compiler, FunKind fun_kind) {
   // with name of an empty string, so user cannot refer to it
   Local *local = current_compiler->locals + current_compiler->local_count++;
   local->depth = 0;
+  local->is_captured = false;
   local->name.start = "";
   local->name.length = 0;
 }
@@ -665,7 +669,11 @@ static void function(FunKind fun_kind) {
 
   // create ObjFunction
   ObjFunction *pfun = end_compiler();
-  emit_opcode_with_param(OP_CLOSURE, chunk_add_constant(current_chunk(), OBJ_VAL(pfun)));
+  // at the moment there is no OP_CLOSURE_LONG, so it will cause bag 
+  // if chunk_add_constant will return index more than 255
+  i32 fun_index = chunk_add_constant(current_chunk(), OBJ_VAL(pfun));
+  assert(fun_index < 255 && "Does not suppord OP_CLOSURE_LONG.");
+  emit_opcode_with_param(OP_CLOSURE, fun_index);
 
   for (i32 i = 0; i < pfun->upvalue_count; ++i) {
     emit_byte((u8)compiler.upvalues[i].is_local);
@@ -806,6 +814,7 @@ static void add_local(const Token *name) {
   Local *local = current_compiler->locals + current_compiler->local_count++;
   local->name = *name;
   local->depth = -1; // sential value during intializer compilation
+  local->is_captured = false;
 }
 
 static bool identifiers_equal(const Token *lhs, const Token *rhs) {
@@ -830,7 +839,13 @@ static void end_scope() {
 
   while (current_compiler->local_count > 0
       && current_compiler->locals[current_compiler->local_count - 1].depth > current_compiler->scope_depth) {
-    emit_byte(OP_POP);
+
+    if (current_compiler->locals[current_compiler->local_count - 1].is_captured) {
+      emit_byte(OP_CLOSE_UPVALUE);
+    } else {
+      emit_byte(OP_POP);
+    }
+
     --current_compiler->local_count;
   }
 }
@@ -1097,6 +1112,7 @@ static i32 resolve_upvalue(Compiler *compiler, const Token *name) {
   i32 local = resolve_local(compiler->penclosing, name);
 
   if (-1 != local) {
+    current_compiler->penclosing->locals[local].is_captured = true;
     return add_upvalue(compiler, (u8)local, true);
   }
 

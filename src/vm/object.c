@@ -137,7 +137,9 @@ ObjNative *native_create(NativeFn pfun, i32 arity) {
 
 ObjUpvalue *upvalue_create(Value *pslot) {
   ObjUpvalue *pupvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
+  pupvalue->closed = NIL_VAL;
   pupvalue->location = pslot;
+  pupvalue->next = NULL;
   return pupvalue;
 }
 

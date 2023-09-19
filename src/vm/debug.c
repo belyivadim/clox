@@ -128,6 +128,10 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
 
       return offset;
     }
+
+    case OP_CLOSE_UPVALUE:
+      return simple_instruction("OP_CLOSE_UPVALUE", offset);
+
     default:
       printf(DISASSEMBLE_COLOR "Unknown opcode %d\n" COLOR_FG_RESET, instruction);
       return offset + 1;

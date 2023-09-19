@@ -99,8 +99,14 @@ typedef struct ObjUpvalue {
   /// Object field
   Obj obj;
 
-  /// pointer to the location of the upvalue
+  /// Pointer to the location of the upvalue
   Value *location;
+
+  /// Closed Value, will be moved here, when it is discarded from the VM's stack
+  Value closed;
+
+  /// Intrusive LL, pointer open upvalues
+  struct ObjUpvalue *next;
 } ObjUpvalue;
 
 /// Runtime representation of function with captured enviroment

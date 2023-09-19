@@ -161,9 +161,15 @@ typedef enum {
   /// @size - 2 byte
   OP_SET_LOCAL,
 
+  /// Takes 1 byte operand that is slot in closure's upvalues array
+  ///
+  /// @Interpreting: reads operand, fetches upvalue at that slot and pushes it onto the VM's stack
   /// @size - 2 byte
   OP_GET_UPVALUE,
 
+  /// Takes 1 byte operand that is slot in closure's upvalues array
+  ///
+  /// @Interpreting: reads operand, and assigns to the upvalue at that slot value from the top of the VM's stack
   /// @size - 2 byte
   OP_SET_UPVALUE,
 
@@ -195,11 +201,20 @@ typedef enum {
   OP_CALL,
 
   /// Takes 1 byte operand that is index of the compiled function 
-  ///   in current chunk's constants array
+  ///   in current chunk's constants array;
+  /// And then variable number of pairs of operands,
+  ///   each pair represents an upvalue: first byte in pair will be 1 if it is local upvalue,
+  ///   and 0 otherwise, and second byte represents the slot of an upvalue in frame slots 
   ///
   /// @Interpreting:
-  /// @size = 2 bytes
+  /// @size = variable, at least 2 bytes (opcode + function + optional upvalues)
   OP_CLOSURE,
+
+  /// Bare opcode, takes no operands
+  ///
+  /// @Interpreting: TODO
+  /// @size = 1 byte
+  OP_CLOSE_UPVALUE,
 
   /// Bare opcode, takes no operands
   /// @size - 1 byte

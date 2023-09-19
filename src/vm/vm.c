@@ -77,6 +77,13 @@ static void vm_process_return();
 
 static ObjUpvalue *capture_upvalue(Value *local);
 
+/// Closes every open upvalue at the stack that are on last or above position
+///   by copying actual Value from the stack to Upvalue and discarding it from the VM's LL
+///
+/// @param last: pointer to the last (bottom) value to be closed
+/// @return void
+static void close_upvalues(Value *last);
+
 Vm* vm_instance() {
   static Vm vm;
   return &vm;
@@ -132,6 +139,7 @@ static void vm_stack_reset() {
   Vm *vm = vm_instance();
   vm->stack_top = vm->stack;
   vm->frame_count = 0;
+  vm->open_upvalues = NULL;
 }
 
 static bool is_falsey(Value value) {
@@ -405,8 +413,19 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_CLOSE_UPVALUE: {
+        close_upvalues(vm_stack_top());
+        vm_stack_pop();
+        break;
+      }
+
       case OP_RETURN: {
         Value result = vm_stack_pop();
+
+        /// since returning from the function
+        /// we need to close every upvalue in surrounding function
+        /// (upvalues owner by the returning function)
+        close_upvalues(frame->slots);
 
         if (0 == --vm->frame_count) {
           vm_stack_pop();
@@ -436,8 +455,40 @@ static InterpreterResult vm_run() {
 
 
 static ObjUpvalue *capture_upvalue(Value *plocal) {
+  Vm *vm = vm_instance();
+  ObjUpvalue *p_prev_upvalue = NULL;
+  ObjUpvalue *p_upvalue = vm->open_upvalues;
+
+  while (NULL != p_upvalue && p_upvalue->location > plocal) {
+    p_prev_upvalue = p_upvalue;
+    p_upvalue = p_upvalue->next;
+  }
+
+  if (NULL != p_upvalue && p_upvalue->location == plocal) {
+    return p_upvalue;
+  }
+
   ObjUpvalue *p_created_upvalue = upvalue_create(plocal);
+  p_created_upvalue->next = p_upvalue;
+
+  if (NULL == p_prev_upvalue) {
+    vm->open_upvalues = p_created_upvalue;
+  } else {
+    p_prev_upvalue->next = p_created_upvalue;
+  }
+
   return p_created_upvalue;
+}
+
+static void close_upvalues(Value *last) {
+  Vm *vm = vm_instance();
+  while (NULL != vm->open_upvalues
+      && vm->open_upvalues->location >= last) {
+    ObjUpvalue *p_upvalue = vm->open_upvalues;
+    p_upvalue->closed = *p_upvalue->location;
+    p_upvalue->location = &p_upvalue->closed;
+    vm->open_upvalues = p_upvalue->next;
+  }
 }
 
 static void vm_process_constant(Value constant) {
