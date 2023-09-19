@@ -50,13 +50,13 @@ static void concatenate();
 ///   false otherwise
 static bool vm_call_value(Value callee, i32 arg_count);
 
-/// Calls function by allocating new frame onto the VM's frames
+/// Calls closure's function by allocating new frame onto the VM's frames
 ///
-/// @param pfun: pointer to the called functio
+/// @param pclosure: pointer to the closure which function should be called
 /// @param arg_count: number of arguments being passed
 /// @return bool, true if number of argumets is the same as arity,
 ///   false otherwise
-static bool vm_call(ObjFunction *pfun, i32 arg_count);
+static bool vm_call(ObjClosure *pclosure, i32 arg_count);
 
 /// Defines native function in the global namespace
 ///
@@ -74,6 +74,8 @@ static void vm_process_define_global(const ObjString *name);
 static InterpreterResult vm_process_get_global(const ObjString *name);
 static InterpreterResult vm_process_set_global(const ObjString *name);
 static void vm_process_return();
+
+static ObjUpvalue *capture_upvalue(Value *local);
 
 Vm* vm_instance() {
   static Vm vm;
@@ -159,19 +161,22 @@ InterpreterResult vm_interpret(const char *source) {
   if (NULL == pfun) return INTERPRET_COMPILE_ERROR;
 
   vm_stack_push(OBJ_VAL(pfun));
-  vm_call_value(OBJ_VAL(pfun), 0);
+  ObjClosure *pclosure = closure_create(pfun);
+  vm_stack_pop();
+  vm_stack_push(OBJ_VAL(pclosure));
+  vm_call_value(OBJ_VAL(pclosure), 0);
   
   return vm_run();
 }
 
 
 static InterpreterResult vm_run() {
-#define OFFSET() (frame->ip - frame->pfun->chunk.code)
+#define OFFSET() (frame->ip - frame->pclosure->pfun->chunk.code)
 #define READ_BYTE() (*frame->ip++)
-#define READ_CONSTANT() (frame->pfun->chunk.constants.values[READ_BYTE()])
+#define READ_CONSTANT() (frame->pclosure->pfun->chunk.constants.values[READ_BYTE()])
 #define READ_CONSTANT_LONG() \
-  (frame->pfun->chunk.constants.values[\
-    chunk_get_constant_long_index(&frame->pfun->chunk, OFFSET())\
+  (frame->pclosure->pfun->chunk.constants.values[\
+    chunk_get_constant_long_index(&frame->pclosure->pfun->chunk, OFFSET())\
   ])
 #define SKIP_BYTES(n) (frame->ip += (n))
 
@@ -201,7 +206,7 @@ static InterpreterResult vm_run() {
       printf(" )"); \
     } \
     puts(""); \
-    chunk_disassemble_instruction(&frame->pfun->chunk, OFFSET());\
+    chunk_disassemble_instruction(&frame->pclosure->pfun->chunk, OFFSET());\
   } while (0)
 #else
 #define PRINT_DEBUG_INFO() (void)0
@@ -340,6 +345,18 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_GET_UPVALUE: {
+        u8 slot = READ_BYTE();
+        vm_stack_push(*frame->pclosure->upvalues[slot]->location);
+        break;
+      }
+
+      case OP_SET_UPVALUE: {
+        u8 slot = READ_BYTE();
+        *frame->pclosure->upvalues[slot]->location = *vm_stack_top();
+        break;
+      }
+
       case OP_JUMP: {
         u16 offset = READ_U16();
         frame->ip += offset;
@@ -367,6 +384,24 @@ static InterpreterResult vm_run() {
           return INTERPRETER_RUNTUME_ERROR;
         }
         frame = vm->frames + vm->frame_count - 1;
+        break;
+      }
+
+      case OP_CLOSURE: {
+        ObjFunction *pfun = AS_FUNCTION(READ_CONSTANT());
+        ObjClosure *pclosure = closure_create(pfun);
+        vm_stack_push(OBJ_VAL(pclosure));
+
+        for (i32 i = 0; i < pclosure->upvalue_count; ++i) {
+          u8 is_local = READ_BYTE();
+          u8 index = READ_BYTE();
+          if (is_local) {
+            pclosure->upvalues[i] = capture_upvalue(frame->slots + index);
+          } else {
+            pclosure->upvalues[i] = frame->pclosure->upvalues[index];
+          }
+        }
+
         break;
       }
 
@@ -399,6 +434,11 @@ static InterpreterResult vm_run() {
 #undef OFFSET
 }
 
+
+static ObjUpvalue *capture_upvalue(Value *plocal) {
+  ObjUpvalue *p_created_upvalue = upvalue_create(plocal);
+  return p_created_upvalue;
+}
 
 static void vm_process_constant(Value constant) {
   vm_stack_push(constant);
@@ -433,8 +473,8 @@ static InterpreterResult vm_process_set_global(const ObjString *name) {
 static bool vm_call_value(Value callee, i32 arg_count) {
   if (IS_OBJ(callee)) {
     switch (OBJ_KIND(callee)) {
-      case OBJ_FUNCTION:
-        return vm_call(AS_FUNCTION(callee), arg_count);
+      case OBJ_CLOSURE:
+        return vm_call(AS_CLOSURE(callee), arg_count);
 
       case OBJ_NATIVE: {
         i32 arity = AS_NATIVE_OBJ(callee)->arity; 
@@ -461,10 +501,10 @@ static bool vm_call_value(Value callee, i32 arg_count) {
   return false;
 }
 
-static bool vm_call(ObjFunction *pfun, i32 arg_count) {
-  if (arg_count != pfun->arity) {
+static bool vm_call(ObjClosure *pclosure, i32 arg_count) {
+  if (arg_count != pclosure->pfun->arity) {
     runtime_error("Expected %d argumnets, but got %d.",
-                  pfun->arity, arg_count);
+                  pclosure->pfun->arity, arg_count);
     return false;
   }
 
@@ -476,8 +516,8 @@ static bool vm_call(ObjFunction *pfun, i32 arg_count) {
   }
 
   CallFrame *pframe = vm->frames + vm->frame_count++;
-  pframe->pfun = pfun;
-  pframe->ip = pfun->chunk.code;
+  pframe->pclosure = pclosure;
+  pframe->ip = pclosure->pfun->chunk.code;
 
   pframe->slots = vm->stack_top - arg_count - 1;
   return true;
@@ -510,7 +550,7 @@ static void runtime_error(const char *format, ...) {
 
   for (i32 i = vm->frame_count - 1; i > 0; --i) {
     CallFrame *pframe = vm->frames + i;
-    ObjFunction *pfun = pframe->pfun;
+    ObjFunction *pfun = pframe->pclosure->pfun;
 
     usize instruction = pframe->ip - pfun->chunk.code - 1;
     i32 line = chunk_get_line(&pfun->chunk, instruction);

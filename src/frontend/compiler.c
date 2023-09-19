@@ -67,6 +67,11 @@ typedef struct {
   i32 depth;
 } Local;
 
+typedef struct {
+  u8 index;
+  bool is_local;
+} Upvalue;
+
 typedef enum {
   FUN_KIND_FUNCTION,
   FUN_KIND_SCRIPT
@@ -91,6 +96,9 @@ typedef struct Compiler {
 
   /// Current scope deapth
   i32 scope_depth;
+
+  /// Array of currently define upvalues
+  Upvalue upvalues[U8_COUNT];
 } Compiler;
 
 
@@ -255,6 +263,15 @@ static u8 argument_list();
 /// return void
 static void named_variable(const Token *name, bool can_assign);
 
+/// Looking for a closest to current scope upvalue
+///
+/// @param compiler: pointer to the current compiler
+/// @param name: pointer to the token with value name to resolve
+/// @return i32, upvalue index, or -1 1 if not found
+static i32 resolve_upvalue(Compiler *compiler, const Token *name);
+
+static i32 add_upvalue(Compiler *compiler, u8 index, bool is_local);
+
 
 static void declaration_handler();
 static void statement_handler();
@@ -321,7 +338,7 @@ static i32 parse_variable(const char *error_msg);
 ///
 /// @param name: pointer to the token of kind TOK_IDENTIFIER
 /// @return i32, index of the variable identifier in chunks constants array
-static i32 identintifier_constant(const Token *name);
+static i32 identifier_constant(const Token *name);
 
 /// Emits VM's opcode with the name with index param
 ///   where index param is index of constant value in the current chunk's constants array
@@ -648,7 +665,12 @@ static void function(FunKind fun_kind) {
 
   // create ObjFunction
   ObjFunction *pfun = end_compiler();
-  emit_opcode_with_param(OP_CONSTANT, emit_constant(OBJ_VAL(pfun)));
+  emit_opcode_with_param(OP_CLOSURE, chunk_add_constant(current_chunk(), OBJ_VAL(pfun)));
+
+  for (i32 i = 0; i < pfun->upvalue_count; ++i) {
+    emit_byte((u8)compiler.upvalues[i].is_local);
+    emit_byte(compiler.upvalues[i].index);
+  }
 }
 
 static void return_statement_handler() {
@@ -723,10 +745,10 @@ static i32 parse_variable(const char *error_msg)  {
   declare_variable();
   if (current_compiler->scope_depth > 0) return -1;
 
-  return identintifier_constant(&parser.previous);
+  return identifier_constant(&parser.previous);
 }
 
-static i32 identintifier_constant(const Token *name) {
+static i32 identifier_constant(const Token *name) {
   assert(TOK_IDENTIFIER == name->kind);
   return chunk_add_constant(current_chunk(), OBJ_VAL(string_copy(name->start, name->length)));
 }
@@ -900,7 +922,7 @@ static void consume(TokenKind kind, const char *message) {
 }
 
 static ObjFunction* end_compiler() {
-  emit_return();
+  emit_return(); 
   ObjFunction *pfun = current_compiler->pfun;
 
 #ifdef DEBUG_PRINT_CODE
@@ -1052,8 +1074,11 @@ static void named_variable(const Token *name, bool can_assign) {
   if (-1 != param) {
     get_op = OP_GET_LOCAL;
     set_op = OP_SET_LOCAL;
+  } else if (-1 != (param = resolve_upvalue(current_compiler, name))) {
+    get_op = OP_GET_UPVALUE;
+    set_op = OP_SET_UPVALUE;
   } else {
-    param = identintifier_constant(name);
+    param = identifier_constant(name);
     get_op = OP_GET_GLOBAL;
     set_op = OP_SET_GLOBAL;
   }
@@ -1065,6 +1090,24 @@ static void named_variable(const Token *name, bool can_assign) {
     emit_opcode_with_param(get_op, param);
   }
 }
+
+static i32 resolve_upvalue(Compiler *compiler, const Token *name) {
+  if (NULL == compiler->penclosing) return -1;
+
+  i32 local = resolve_local(compiler->penclosing, name);
+
+  if (-1 != local) {
+    return add_upvalue(compiler, (u8)local, true);
+  }
+
+  i32 upvalue = resolve_upvalue(compiler->penclosing, name);
+  if (-1 != upvalue) {
+    return add_upvalue(compiler, (u8)upvalue, false);
+  }
+
+  return -1;
+}
+
 
 static i32 resolve_local(const Compiler *compiler, const Token *name) {
   for (i32 i = compiler->local_count - 1; i >= 0; --i) {
@@ -1079,6 +1122,26 @@ static i32 resolve_local(const Compiler *compiler, const Token *name) {
   }
 
   return -1;
+}
+
+static i32 add_upvalue(Compiler *compiler, u8 index, bool is_local) {
+  i32 upvalue_count = compiler->pfun->upvalue_count;
+
+  for (i32 i = 0; i < upvalue_count; ++i) {
+    Upvalue *upvalue = compiler->upvalues + i;
+    if (upvalue->index == index && upvalue->is_local == is_local) {
+      return i;
+    }
+  }
+
+  if (U8_COUNT == upvalue_count) {
+    error("Too many closure variables in function.");
+    return 0;
+  }
+
+  compiler->upvalues[upvalue_count].is_local = is_local;
+  compiler->upvalues[upvalue_count].index = index;
+  return compiler->pfun->upvalue_count++;
 }
 
 static void mark_initialized() {

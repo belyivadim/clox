@@ -107,10 +107,38 @@ ObjFunction *function_create() {
   ObjFunction *pfun = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
 
   pfun->arity = 0;
+  pfun->upvalue_count = 0;
   pfun->name = NULL;
   chunk_init(&pfun->chunk);
   
   return pfun;
+}
+
+ObjClosure *closure_create(ObjFunction *pfun) {
+  ObjUpvalue **upvalues = ALLOCATE(ObjUpvalue*, pfun->upvalue_count);
+
+  for (i32 i = 0; i < pfun->upvalue_count; ++i) {
+    upvalues[i] = NULL;
+  }
+
+  ObjClosure *pclosure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
+  pclosure->pfun = pfun;
+  pclosure->upvalues = upvalues;
+  pclosure->upvalue_count = pfun->upvalue_count;
+  return pclosure;
+}
+
+ObjNative *native_create(NativeFn pfun, i32 arity) {
+  ObjNative *pnative = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
+  pnative->pfun = pfun;
+  pnative->arity = arity;
+  return pnative;
+}
+
+ObjUpvalue *upvalue_create(Value *pslot) {
+  ObjUpvalue *pupvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
+  pupvalue->location = pslot;
+  return pupvalue;
 }
 
 void object_print(Value value) {
@@ -129,13 +157,16 @@ void object_print(Value value) {
       function_print(AS_FUNCTION(value));
       break;
     }
-  }
-}
 
-ObjNative *native_create(NativeFn pfun, i32 arity) {
-  ObjNative *pnative = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
-  pnative->pfun = pfun;
-  pnative->arity = arity;
-  return pnative;
+    case OBJ_CLOSURE: {
+      function_print(AS_CLOSURE(value)->pfun);
+      break;
+    }
+
+    case OBJ_UPVALUE: {
+      printf("upvalue");
+      break;
+    }
+  }
 }
 

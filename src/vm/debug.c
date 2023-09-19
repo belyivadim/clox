@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "debug.h"
+#include "vm/object.h"
 
 static i32 simple_instruction(const char *name, i32 offset);
 static i32 constant_instruction(const char *name, const Chunk *chunk, i32 offset);
@@ -96,6 +97,10 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
       return byte_instruction("OP_GET_LOCAL", chunk, offset);
     case OP_SET_LOCAL:
       return byte_instruction("OP_SET_LOCAL", chunk, offset);
+    case OP_GET_UPVALUE:
+      return byte_instruction("OP_GET_UPVALUE", chunk, offset);
+    case OP_SET_UPVALUE:
+      return byte_instruction("OP_SET_UPVALUE", chunk, offset);
     case OP_JUMP:
       return jump_instruction("OP_JUMP", 1, chunk, offset);
     case OP_JUMP_IF_FALSE:
@@ -104,8 +109,27 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
       return jump_instruction("OP_LOOP", -1, chunk, offset);
     case OP_CALL:
       return byte_instruction("OP_CALL", chunk, offset);
+    case OP_CLOSURE: {
+      ++offset;
+      u8 constant = chunk->code[offset++];
+      printf(DISASSEMBLE_COLOR "%-16s [%6d] ", "OP_CLOSURE", constant);
+      value_print(chunk->constants.values[constant]);
+      puts("");
+
+      ObjFunction * pfun = AS_FUNCTION(chunk->constants.values[constant]);
+      for (i32 j = 0; j < pfun->upvalue_count; ++j) {
+        i32 is_local = chunk->code[offset++];
+        i32 index = chunk->code[offset++];
+        printf("%04d      |                      %s %d\n",
+               offset - 2, is_local ? "local" : "upvalue", index);
+      }
+
+      printf(COLOR_FG_RESET);
+
+      return offset;
+    }
     default:
-      printf("Unknown opcode %d\n", instruction);
+      printf(DISASSEMBLE_COLOR "Unknown opcode %d\n" COLOR_FG_RESET, instruction);
       return offset + 1;
   }
 

@@ -161,6 +161,12 @@ typedef enum {
   /// @size - 2 byte
   OP_SET_LOCAL,
 
+  /// @size - 2 byte
+  OP_GET_UPVALUE,
+
+  /// @size - 2 byte
+  OP_SET_UPVALUE,
+
   /// Takes 2 (16-bits) byte operand that is offset in bytes how many bytes to jump
   ///
   /// @Interpreting: reads the operand, then increments VM's ip on the read value
@@ -183,9 +189,17 @@ typedef enum {
 
   /// Takes 1 byte operand that is number of arguments being passed
   ///
-  /// @Interpreting: 
+  /// @Interpreting: reads the operand as argc, 
+  ///   then call value on top of the stack with argc
   /// @size = 2 bytes
   OP_CALL,
+
+  /// Takes 1 byte operand that is index of the compiled function 
+  ///   in current chunk's constants array
+  ///
+  /// @Interpreting:
+  /// @size = 2 bytes
+  OP_CLOSURE,
 
   /// Bare opcode, takes no operands
   /// @size - 1 byte

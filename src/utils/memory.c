@@ -57,5 +57,17 @@ static void object_free(Obj *pobj) {
       FREE(ObjFunction, pobj);
       break;
     }
+
+    case OBJ_CLOSURE: {
+      ObjClosure *pclosure = (ObjClosure*)pobj;
+      FREE_ARRAY(ObjUpvalue*, pclosure->upvalues, pclosure->upvalue_count);
+      FREE(ObjClosure, pobj);
+      break;
+    }
+
+    case OBJ_UPVALUE: {
+      FREE(ObjUpvalue, pobj);
+      break;
+    }
   }
 }

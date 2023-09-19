@@ -12,8 +12,8 @@ enum {
 
 /// Represents frame of the call stack
 typedef struct {
-  /// Pointer to the function being called
-  ObjFunction *pfun;
+  /// Pointer to the closure being called
+  ObjClosure *pclosure;
 
   /// Instruction pointer of the caller
   ///   VM will jump to this instruction after return

@@ -9,11 +9,13 @@
 #define OBJ_KIND(v)       (AS_OBJ(v)->kind)
 
 /// Object's kind identifiers
+#define IS_CLOSURE(v)     is_obj_kind(v, OBJ_CLOSURE)
 #define IS_FUNCTION(v)    is_obj_kind(v, OBJ_FUNCTION)
 #define IS_NATIVE(v)      is_obj_kind(v, OBJ_NATIVE)
 #define IS_STRING(v)      is_obj_kind(v, OBJ_STRING)
 
 /// Object's accessors
+#define AS_CLOSURE(v)     ((ObjClosure*)AS_OBJ(v))
 #define AS_FUNCTION(v)    ((ObjFunction*)AS_OBJ(v))
 #define AS_NATIVE(v)      (((ObjNative*)AS_OBJ(v))->pfun)
 #define AS_NATIVE_OBJ(v)  ((ObjNative*)AS_OBJ(v))
@@ -24,9 +26,11 @@
 
 /// Represents all the possible tags of object types
 typedef enum {
+  OBJ_CLOSURE,
   OBJ_FUNCTION,
   OBJ_NATIVE,
-  OBJ_STRING
+  OBJ_STRING,
+  OBJ_UPVALUE
 } ObjKind;
 
 /// Represents heap allocated object in VM
@@ -51,6 +55,9 @@ typedef struct {
 
   /// Number of parameters the function expects
   i32 arity;
+
+  /// Number of upvalues in function
+  i32 upvalue_count;
 } ObjFunction;
 
 /// Represents pointer to native clox function 
@@ -86,6 +93,30 @@ struct ObjString {
   /// cache for the hash value of string pointed by chars
   u32 hash;
 };
+
+/// Represents runtime upvalue
+typedef struct ObjUpvalue {
+  /// Object field
+  Obj obj;
+
+  /// pointer to the location of the upvalue
+  Value *location;
+} ObjUpvalue;
+
+/// Runtime representation of function with captured enviroment
+typedef struct {
+  /// Object field
+  Obj obj;
+
+  /// Pointer to the compiled function
+  ObjFunction *pfun;
+
+  /// Array of arrays of upvalues that closure encloses
+  ObjUpvalue **upvalues;
+
+  /// Number of active upvalues
+  i32 upvalue_count;
+} ObjClosure;
 
 
 /// Check is the value is object, 
@@ -128,6 +159,21 @@ ObjFunction *function_create();
 /// @return ObjNative*, pointer to the newly allocated ObjNative,
 ///   passes ownership to the caller
 ObjNative *native_create(NativeFn pfun, i32 arity);
+
+/// Creates new closure object
+///
+/// @param pfun: pointer to the function 
+///   based on which closure should be created
+/// @return ObjClosure* , pointer to the newly allocated ObjClosure,
+///   passes ownership to the caller
+ObjClosure *closure_create(ObjFunction *pfun);
+
+/// Creates new upvalue object
+///
+/// @param pslot: pointer where Value is located
+/// @return ObjUpvalue*, pointer to the newly allocated ObjUpvalue,
+///   passes ownership to the caller
+ObjUpvalue *upvalue_create(Value *pslot);
 
 /// Prints the value param as an object
 ///
