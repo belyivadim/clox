@@ -40,6 +40,9 @@ struct Obj {
 
   /// Pointer to the next heap allocated object
   struct Obj *next;
+  
+  /// Is it marked by GC
+  bool is_marked;
 };
 
 /// Represents first class function in Lox
@@ -186,5 +189,7 @@ ObjUpvalue *upvalue_create(Value *pslot);
 /// @param value: value to be printed
 /// @return void
 void object_print(Value value);
+
+const char *object_kind_to_string(ObjKind kind);
 
 #endif // !__CLOX_OBJECT_H__

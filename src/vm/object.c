@@ -6,6 +6,8 @@
 #include "value.h"
 #include "vm.h"
 
+#include "vm/debug.h"
+
 #define ALLOCATE_OBJ(T, obj_kind) \
   (T*)object_allocate(sizeof(T), obj_kind)
 
@@ -65,7 +67,6 @@ static ObjString *string_allocate(char *chars, u32 length, u32 hash) {
 
   table_set(&vm_instance()->strings, str, NIL_VAL);
 
-  printf("New ObjString is allocated at %p\n", str);
   return str;
 }
 
@@ -83,11 +84,17 @@ static u32 string_hash(const char *key, u32 length) {
 static Obj* object_allocate(usize size, ObjKind kind) {
   Obj *pobj = (Obj*)reallocate(NULL, 0, size);
   pobj->kind = kind;
+  pobj->is_marked = false;
 
   Vm* vm = vm_instance();
 
   pobj->next = vm->objects;
   vm->objects = pobj;
+
+#ifdef DEBUG_LOG_GC
+  printf(COLOR_FG_YELLOW "%p allocated with size of %ld for %s\n" COLOR_FG_RESET, 
+         (void*)pobj, size, object_kind_to_string(kind));
+#endif // !DEBUG_LOG_GC
 
   return pobj;
 }
@@ -172,3 +179,15 @@ void object_print(Value value) {
   }
 }
 
+const char *object_kind_to_string(ObjKind kind) {
+  switch (kind) {
+    case OBJ_CLOSURE: return "OBJ_CLOSURE";
+    case OBJ_FUNCTION: return "OBJ_FUNCTION";
+    case OBJ_NATIVE: return "OBJ_NATIVE";
+    case OBJ_STRING: return "OBJ_STRING";
+    case OBJ_UPVALUE: return "OBJ_UPVALUE";
+
+    default:
+      return "<Unknown object kind>";
+  }
+}

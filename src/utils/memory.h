@@ -2,6 +2,7 @@
 #define __CLOX_MEMORY_H__
 
 #include "common.h"
+#include "../vm/value.h"
 
 enum {
   MEM_MIN_CAPACITY = 8,
@@ -38,9 +39,21 @@ enum {
 /// @return void*, pointer to newly allocated memory or NULL in case if new_size is 0
 void *reallocate(void *ptr, usize old_size, usize new_size);
 
+/// Runs garbage collector (uses mark-and-swap algorithm)
+///
+/// @return void
+void collect_garbage();
+
+/// GC marks value
+void mark_value(Value value);
+
+/// GC marks object
+void mark_object(Obj *pobj);
+
 /// Frees all heap-allocated objects in virtual machine singleton
 ///
 /// @return void
 void free_objects();
+
 
 #endif // !__CLOX_MEMORY_H__

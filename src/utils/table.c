@@ -183,3 +183,10 @@ static void adjust_capacity(Table *table, i32 capacity) {
 }
 
 
+void mark_table(Table* table) {
+  for (i32 i = 0; i < table->capacity; ++i) {
+    Entry *e = table->entries + i;
+    mark_object((Obj*)e->key);
+    mark_value(e->value);
+  }
+}
