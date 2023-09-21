@@ -49,8 +49,17 @@ typedef struct {
   /// VM is owner of this LL
   ObjUpvalue *open_upvalues;
 
-  // Pointer to the head of the list of heap allocated objects
+  /// Pointer to the head of the list of heap allocated objects
   Obj *objects;
+
+  /// Stack of the gray objects during GC
+  Obj **gray_stack;
+
+  /// Number of active elements in the gray stack
+  i32 gray_count;
+
+  /// Capacity of the gray stack
+  i32 gray_capacity;
 } Vm;
 
 /// Represents status codes of interpretation

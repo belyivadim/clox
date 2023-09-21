@@ -93,6 +93,11 @@ void vm_init() {
   vm_stack_reset();
   Vm* vm = vm_instance();
   vm->objects = NULL;
+
+  vm->gray_count = 0;
+  vm->gray_capacity = 0;
+  vm->gray_stack = NULL;
+
   table_init(&vm->globals);
   table_init(&vm->strings);
 

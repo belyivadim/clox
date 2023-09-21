@@ -11,4 +11,10 @@
 ///   or NULL if compile time error has been occured
 ObjFunction *compile(const char *source);
 
+/// Util function for GC, since compiler also uses 
+///   heap objects, it should mark them
+///
+/// @return void
+void mark_compiler_roots();
+
 #endif // !__CLOX_COMPILER_H__

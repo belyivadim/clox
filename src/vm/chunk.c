@@ -1,6 +1,7 @@
 #include "chunk.h"
 #include "utils/memory.h"
 #include "vm/value.h"
+#include "vm.h"
 
 #define GROW_VEC(T, vec, capacity) \
   do { \
@@ -91,7 +92,10 @@ i32 chunk_get_constant_long_index(const Chunk *chunk, i32 offset) {
 i32 chunk_add_constant(Chunk *chunk, Value constant) {
   assert(NULL != chunk);
 
+  // push constant onto the VM's stack to prevent GC from collecting it
+  vm_stack_push(constant);
   value_array_write(&chunk->constants, constant);
+  vm_stack_pop();
   return chunk->constants.count - 1;
 }
 

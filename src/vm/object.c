@@ -65,7 +65,9 @@ static ObjString *string_allocate(char *chars, u32 length, u32 hash) {
   str->chars = chars;
   str->hash = hash;
 
+  vm_stack_push(OBJ_VAL(str));
   table_set(&vm_instance()->strings, str, NIL_VAL);
+  vm_stack_pop();
 
   return str;
 }

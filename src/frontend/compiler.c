@@ -8,6 +8,7 @@
 #include "scanner.h"
 #include "vm/chunk.h"
 #include "../vm/object.h"
+#include "../utils/memory.h"
 
 #include "../vm/debug.h"
 
@@ -1194,4 +1195,13 @@ static void parse_precedence(Precedence precedence) {
 
 static ParseRule *get_rule(TokenKind kind) {
   return &rules[kind];
+}
+
+
+void mark_compiler_roots() {
+  Compiler *compiler = current_compiler;
+  while (NULL != compiler) {
+    mark_object((Obj*)compiler->pfun);
+    compiler = compiler->penclosing;
+  }
 }

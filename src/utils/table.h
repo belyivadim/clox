@@ -83,7 +83,8 @@ const ObjString* table_find_string(const Table *table, const char *chars, u32 le
 /// @return void
 void table_add_all(Table* dest, const Table *src);
 
-/// Utility for GC
+/// Utilities for GC
 void mark_table(Table* table);
+void table_remove_white(Table *table);
 
 #endif // !__CLOX_TABLE_H__
