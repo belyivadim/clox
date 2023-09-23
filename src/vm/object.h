@@ -9,12 +9,14 @@
 #define OBJ_KIND(v)       (AS_OBJ(v)->kind)
 
 /// Object's kind identifiers
+#define IS_CLASS(v)       is_obj_kind(v, OBJ_CLASS)
 #define IS_CLOSURE(v)     is_obj_kind(v, OBJ_CLOSURE)
 #define IS_FUNCTION(v)    is_obj_kind(v, OBJ_FUNCTION)
 #define IS_NATIVE(v)      is_obj_kind(v, OBJ_NATIVE)
 #define IS_STRING(v)      is_obj_kind(v, OBJ_STRING)
 
 /// Object's accessors
+#define AS_CLASS(v)       ((ObjClass*)AS_OBJ(v))
 #define AS_CLOSURE(v)     ((ObjClosure*)AS_OBJ(v))
 #define AS_FUNCTION(v)    ((ObjFunction*)AS_OBJ(v))
 #define AS_NATIVE(v)      (((ObjNative*)AS_OBJ(v))->pfun)
@@ -26,6 +28,7 @@
 
 /// Represents all the possible tags of object types
 typedef enum {
+  OBJ_CLASS,
   OBJ_CLOSURE,
   OBJ_FUNCTION,
   OBJ_NATIVE,
@@ -127,6 +130,15 @@ typedef struct {
   i32 upvalue_count;
 } ObjClosure;
 
+/// Represents clox class
+typedef struct {
+  /// Object field
+  Obj obj;
+
+  /// Name of the class
+  const ObjString *name;
+} ObjClass;
+
 
 /// Check is the value is object, 
 /// if it is check if object's kind corresponds to kind param
@@ -183,6 +195,13 @@ ObjClosure *closure_create(ObjFunction *pfun);
 /// @return ObjUpvalue*, pointer to the newly allocated ObjUpvalue,
 ///   passes ownership to the caller
 ObjUpvalue *upvalue_create(Value *pslot);
+
+/// Creates new class object
+///
+/// @param name: pointer to the string that represents class name
+/// @return ObjClass*, pointer to the newly allocated ObjClass,
+///   passes ownership to the caller
+ObjClass *class_create(const ObjString *name);
 
 /// Prints the value param as an object
 ///

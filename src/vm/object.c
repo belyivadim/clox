@@ -152,8 +152,20 @@ ObjUpvalue *upvalue_create(Value *pslot) {
   return pupvalue;
 }
 
+
+ObjClass *class_create(const ObjString *name) {
+  ObjClass *pcls = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
+  pcls->name = name;
+  return pcls;
+}
+
 void object_print(Value value) {
   switch (OBJ_KIND(value)) {
+    case OBJ_CLASS: {
+      printf("<class %s>", AS_CLASS(value)->name->chars);
+      break;
+    }
+
     case OBJ_STRING: {
       printf("%s", AS_CSTRING(value));
       break;

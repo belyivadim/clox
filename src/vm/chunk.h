@@ -206,15 +206,27 @@ typedef enum {
   ///   each pair represents an upvalue: first byte in pair will be 1 if it is local upvalue,
   ///   and 0 otherwise, and second byte represents the slot of an upvalue in frame slots 
   ///
-  /// @Interpreting:
+  /// @Interpreting: creates closure based on the function operand
   /// @size = variable, at least 2 bytes (opcode + function + optional upvalues)
   OP_CLOSURE,
 
   /// Bare opcode, takes no operands
   ///
-  /// @Interpreting: TODO
+  /// @Interpreting: moves upvalue to the closed field
   /// @size = 1 byte
   OP_CLOSE_UPVALUE,
+
+  /// Takes 1 byte operand that is index in current chunk's 
+  ///   constants array to the name of the class
+  ///
+  /// @Interpreting: creates runtime representation of the class
+  ///   associated with its name, stored at chunk's constants array
+  ///   at index specified by operand
+  /// @size = 2 bytes
+  OP_CLASS,
+
+  /// @size = 4 bytes
+  OP_CLASS_LONG,
 
   /// Bare opcode, takes no operands
   /// @size - 1 byte

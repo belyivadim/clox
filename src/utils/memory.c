@@ -75,6 +75,11 @@ static void object_free(Obj *pobj) {
 
 
   switch (pobj->kind) {
+    case OBJ_CLASS: {
+      FREE(ObjClass, pobj);
+      break;
+    }
+
     case OBJ_STRING: {
       ObjString *pstr = (ObjString*)pobj;
       FREE_ARRAY(char, pstr->chars, pstr->length + 1);
@@ -204,6 +209,12 @@ static void blacken_object(Obj *pobj) {
 #endif // !DEBUG_LOG_GC
 
   switch (pobj->kind) {
+    case OBJ_CLASS: {
+      ObjClass *pcls = (ObjClass*)pobj;
+      mark_object((Obj*)pcls->name);
+      break;
+    }
+
     case OBJ_CLOSURE: {
       ObjClosure *pclosure = (ObjClosure*)pobj;
       mark_object((Obj*)pclosure->pfun);

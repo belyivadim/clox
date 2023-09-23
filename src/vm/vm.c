@@ -429,6 +429,15 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_CLASS:
+        vm_stack_push(OBJ_VAL(class_create(READ_STRING())));
+        break;
+
+      case OP_CLASS_LONG: 
+        vm_stack_push(OBJ_VAL(class_create(READ_STRING_LONG())));
+        SKIP_BYTES(3);
+        break;
+
       case OP_RETURN: {
         Value result = vm_stack_pop();
 

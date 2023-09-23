@@ -288,6 +288,7 @@ static void while_statement_handler();
 static void for_statement_handler();
 static void fun_decl_handler();
 static void return_statement_handler();
+static void class_decl_handler();
 
 /// Compiles the function
 ///
@@ -494,7 +495,9 @@ ObjFunction *compile(const char *source) {
 }
 
 static void declaration_handler() {
-  if (match(TOK_FUN)) {
+  if (match(TOK_CLASS)) {
+    class_decl_handler();
+  } else if (match(TOK_FUN)) {
     fun_decl_handler();
   } else if (match(TOK_VAR)) {
     var_decl_handler();
@@ -551,6 +554,18 @@ static void var_decl_handler() {
   consume(TOK_SEMICOLON, "Expect ';' after variable declaration");
 
   define_variable(global);
+}
+
+static void class_decl_handler() {
+  consume(TOK_IDENTIFIER, "Expect class name.");
+  i32 name_constant = identifier_constant(&parser.previous);
+  declare_variable();
+
+  emit_opcode_with_param(OP_CLASS, name_constant);
+  define_variable(name_constant);
+
+  consume(TOK_LEFT_BRACE, "Expect '{' before class body");
+  consume(TOK_RIGHT_BRACE, "Expect '}' after class body");
 }
 
 static void if_statement_handler() {
