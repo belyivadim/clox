@@ -49,6 +49,12 @@ typedef struct {
   /// VM is owner of this LL
   ObjUpvalue *open_upvalues;
 
+  /// How many bytes is allocated for GC objects
+  usize bytes_allocated;
+
+  /// Threshold in bytes when next GC will be invoked
+  usize next_gc;
+
   /// Pointer to the head of the list of heap allocated objects
   Obj *objects;
 

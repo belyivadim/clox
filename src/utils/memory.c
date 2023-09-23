@@ -10,6 +10,7 @@
 #include "../vm/debug.h"
 #endif // !DEBUG_LOG_GC
 
+#define GC_HEAP_GROW_FACTOR 2
 
 /// Frees Object pointed by pobj and all the resources holded by pobj
 ///
@@ -25,11 +26,19 @@ static void mark_array(ValueArray *arr);
 static void sweep();
 
 void *reallocate(void *ptr, usize old_size, usize new_size) {
-#ifdef DEBUG_STRESS_GC
+  Vm *vm = vm_instance();
+
+  vm->bytes_allocated += new_size - old_size;
+
   if (new_size > old_size) {
+#ifdef DEBUG_STRESS_GC
     collect_garbage();
-  }
 #endif // !DEBUG_STRESS_GC
+    if (vm->bytes_allocated > vm->next_gc) {
+      collect_garbage();
+    }
+  }
+
 
   if (new_size == 0) {
     free(ptr);
@@ -100,18 +109,24 @@ static void object_free(Obj *pobj) {
 }
 
 void collect_garbage() {
+  Vm *vm = vm_instance();
+
 #ifdef DEBUG_LOG_GC
   puts(COLOR_FG_YELLOW "-- gc begin");
+  usize before = vm->bytes_allocated;
 #endif // !DEBUG_LOG_GC
 
-  Vm *vm = vm_instance();
   mark_roots();
   trace_references();
   table_remove_white(&vm->strings);
   sweep();
 
+  vm->next_gc = vm->bytes_allocated * GC_HEAP_GROW_FACTOR;
+
 #ifdef DEBUG_LOG_GC
   puts("-- gc end" COLOR_FG_RESET);
+  printf("   collected %ld bytes (from %ld to %ld) next at %ld\n",
+         before - vm->bytes_allocated, before, vm->bytes_allocated, vm->next_gc);
 #endif // !DEBUG_LOG_GC
 
 }

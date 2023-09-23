@@ -94,6 +94,9 @@ void vm_init() {
   Vm* vm = vm_instance();
   vm->objects = NULL;
 
+  vm->bytes_allocated = 0;
+  vm->next_gc = 1024 * 1024;
+
   vm->gray_count = 0;
   vm->gray_capacity = 0;
   vm->gray_stack = NULL;
@@ -154,8 +157,8 @@ static bool is_falsey(Value value) {
 }
 
 static void concatenate() {
-  ObjString *rhs = AS_STRING(vm_stack_pop());
-  ObjString *lhs = AS_STRING(vm_stack_pop());
+  const ObjString *rhs = AS_STRING(*vm_stack_peek(0));
+  const ObjString *lhs = AS_STRING(*vm_stack_peek(1));
 
   u32 length = lhs->length + rhs->length;
   char *chars = ALLOCATE(char, length + 1);
@@ -164,6 +167,8 @@ static void concatenate() {
   chars[length] = '\0';
 
   const ObjString * result = string_create(chars, length);
+  vm_stack_pop();
+  vm_stack_pop();
   vm_stack_push(OBJ_VAL(result));
 }
 

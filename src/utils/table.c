@@ -197,7 +197,6 @@ void table_remove_white(Table *table) {
   for (i32 i = 0; i < table->capacity; ++i) {
     Entry *e = table->entries + i;
     if (NULL != e->key && !e->key->obj.is_marked) {
-      printf(COLOR_FG_RED "[TABLE STRINGS]: deleting %s\n" COLOR_FG_RESET, e->key->chars);
       table_delete(table, e->key);
     }
   }
