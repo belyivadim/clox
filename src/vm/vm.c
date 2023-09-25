@@ -73,6 +73,8 @@ static void vm_process_constant(Value constant);
 static void vm_process_define_global(const ObjString *name);
 static InterpreterResult vm_process_get_global(const ObjString *name);
 static InterpreterResult vm_process_set_global(const ObjString *name);
+static InterpreterResult vm_process_get_property(const ObjString *name);
+static InterpreterResult vm_process_set_property(const ObjString *name);
 static void vm_process_return();
 
 static ObjUpvalue *capture_upvalue(Value *local);
@@ -438,6 +440,30 @@ static InterpreterResult vm_run() {
         SKIP_BYTES(3);
         break;
 
+      case OP_GET_PROPERTY:
+        if (INTERPRET_OK != vm_process_get_property(READ_STRING())) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        break;
+
+      case OP_GET_PROPERTY_LONG: 
+        if (INTERPRET_OK != vm_process_get_property(READ_STRING_LONG())) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        break;
+
+      case OP_SET_PROPERTY: 
+        if (INTERPRET_OK != vm_process_set_property(READ_STRING())) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        break;
+
+      case OP_SET_PROPERTY_LONG: 
+        if (INTERPRET_OK != vm_process_set_property(READ_STRING_LONG())) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        break;
+
       case OP_RETURN: {
         Value result = vm_stack_pop();
 
@@ -470,6 +496,41 @@ static InterpreterResult vm_run() {
 #undef READ_CONSTANT
 #undef READ_BYTE
 #undef OFFSET
+}
+
+static InterpreterResult vm_process_get_property(const ObjString* name) {
+  if (!IS_INSTANCE(*vm_stack_top())) {
+    runtime_error("Only instances have properties.");
+    return INTERPRETER_RUNTUME_ERROR;
+  }
+
+  ObjInstance *pinstance = AS_INSTANCE(*vm_stack_top());
+
+  Value value;
+  if (table_get(&pinstance->fields, name, &value)) {
+    vm_stack_pop(); // instance
+    vm_stack_push(value);
+    return INTERPRET_OK;
+  }
+
+  runtime_error("Undefined property '%s'.", name->chars);
+  return INTERPRETER_RUNTUME_ERROR;
+}
+
+static InterpreterResult vm_process_set_property(const ObjString *name) {
+  if (!IS_INSTANCE(*vm_stack_peek(1))) {
+    runtime_error("Only instances have properties.");
+    return INTERPRETER_RUNTUME_ERROR;
+  }
+
+  ObjInstance *pinstance = AS_INSTANCE(*vm_stack_peek(1));
+  table_set(&pinstance->fields, name, *vm_stack_top());
+
+  Value value = vm_stack_pop();
+  vm_stack_pop(); // instance
+  vm_stack_push(value);
+
+  return INTERPRET_OK;
 }
 
 
@@ -542,7 +603,15 @@ static InterpreterResult vm_process_set_global(const ObjString *name) {
 
 static bool vm_call_value(Value callee, i32 arg_count) {
   if (IS_OBJ(callee)) {
+    Vm *vm = vm_instance();
+
     switch (OBJ_KIND(callee)) {
+      case OBJ_CLASS: {
+        ObjClass *pcls = AS_CLASS(callee);
+        vm->stack_top[-arg_count - 1] = OBJ_VAL(instance_create(pcls));
+        return true;
+      }
+
       case OBJ_CLOSURE:
         return vm_call(AS_CLOSURE(callee), arg_count);
 

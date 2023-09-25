@@ -159,6 +159,13 @@ ObjClass *class_create(const ObjString *name) {
   return pcls;
 }
 
+ObjInstance *instance_create(ObjClass *pcls) {
+  ObjInstance *pinstance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+  pinstance->cls = pcls;
+  table_init(&pinstance->fields);
+  return pinstance;
+}
+
 void object_print(Value value) {
   switch (OBJ_KIND(value)) {
     case OBJ_CLASS: {
@@ -168,6 +175,11 @@ void object_print(Value value) {
 
     case OBJ_STRING: {
       printf("%s", AS_CSTRING(value));
+      break;
+    }
+
+    case OBJ_INSTANCE: {
+      printf("<instance of %s>", AS_INSTANCE(value)->cls->name->chars);
       break;
     }
 
@@ -195,8 +207,10 @@ void object_print(Value value) {
 
 const char *object_kind_to_string(ObjKind kind) {
   switch (kind) {
+    case OBJ_CLASS: return "OBJ_CLASS";
     case OBJ_CLOSURE: return "OBJ_CLOSURE";
     case OBJ_FUNCTION: return "OBJ_FUNCTION";
+    case OBJ_INSTANCE: return "OBJ_INSTANCE";
     case OBJ_NATIVE: return "OBJ_NATIVE";
     case OBJ_STRING: return "OBJ_STRING";
     case OBJ_UPVALUE: return "OBJ_UPVALUE";

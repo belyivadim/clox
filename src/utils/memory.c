@@ -87,6 +87,13 @@ static void object_free(Obj *pobj) {
       break;
     }
 
+    case OBJ_INSTANCE: {
+      ObjInstance *pinstance = (ObjInstance*)pobj;
+      table_free(&pinstance->fields);
+      FREE(ObjInstance, pobj);
+      break;
+    }
+
     case OBJ_NATIVE: {
       FREE(ObjNative, pobj);
       break;
@@ -230,9 +237,18 @@ static void blacken_object(Obj *pobj) {
       mark_array(&pfun->chunk.constants);
       break;
     }
+
     case OBJ_UPVALUE:
       mark_value(((ObjUpvalue*)pobj)->closed);
       break;
+
+    case OBJ_INSTANCE: {
+      ObjInstance *pinstance = (ObjInstance*)pobj;
+      mark_object((Obj*)pinstance->cls);
+      mark_table(&pinstance->fields);
+      break;
+    }
+
     case OBJ_NATIVE:
     case OBJ_STRING:
       break;

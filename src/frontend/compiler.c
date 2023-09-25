@@ -254,6 +254,7 @@ static void call_handler(bool can_assign);
 
 static void and_handler(bool can_assign);
 static void or_handler(bool can_assign);
+static void dot_handler(bool can_assign);
 
 /// Parses argument list for call expression
 ///
@@ -434,7 +435,7 @@ ParseRule rules[] = {
   [TOK_LEFT_BRACE]    = {NULL, NULL, PREC_NONE},
   [TOK_RIGHT_BRACE]   = {NULL, NULL, PREC_NONE},
   [TOK_COMMA]         = {NULL, NULL, PREC_NONE},
-  [TOK_DOT]           = {NULL, NULL, PREC_NONE},
+  [TOK_DOT]           = {NULL, dot_handler, PREC_CALL},
   [TOK_MINUS]         = {unary_handler, binary_handler, PREC_TERM},
   [TOK_PLUS]          = {NULL, binary_handler, PREC_TERM},
   [TOK_SEMICOLON]     = {NULL, NULL, PREC_NONE},
@@ -1096,6 +1097,18 @@ static u8 argument_list() {
 
 static void variable_handler(bool can_assign) {
   named_variable(&parser.previous, can_assign);
+}
+
+static void dot_handler(bool can_assign) {
+  consume(TOK_IDENTIFIER, "Expect property name after '.'.");
+  i32 name = identifier_constant(&parser.previous);
+
+  if (can_assign && match(TOK_EQUAL)) {
+    expression();
+    emit_opcode_with_param(OP_SET_PROPERTY, name);
+  } else {
+    emit_opcode_with_param(OP_GET_PROPERTY, name);
+  }
 }
 
 static void named_variable(const Token *name, bool can_assign) {

@@ -173,6 +173,27 @@ typedef enum {
   /// @size - 2 byte
   OP_SET_UPVALUE,
 
+  /// Takes 1 byte operand that is index in chunk's constant array
+  ///   to the name of property
+  ///
+  /// @Interpreting: reads operand, then lookup for the value with read name
+  ///   in the fields table of the top stack's object, pushes it onto the stack
+  /// @size - 2 bytes
+  OP_GET_PROPERTY,
+
+  /// @size - 4 bytes
+  OP_GET_PROPERTY_LONG,
+
+  /// Takes 1 byte operand that is index in chunk's constant array
+  ///   to the name of property
+  /// @Interpreting: reads operand, then set field 
+  ///   of the top - 1 object on the stack to value on top of the stack
+  /// @size - 2 bytes
+  OP_SET_PROPERTY,
+
+  /// @size - 4 bytes
+  OP_SET_PROPERTY_LONG,
+
   /// Takes 2 (16-bits) byte operand that is offset in bytes how many bytes to jump
   ///
   /// @Interpreting: reads the operand, then increments VM's ip on the read value
