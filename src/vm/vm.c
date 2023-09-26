@@ -75,7 +75,9 @@ static InterpreterResult vm_process_get_global(const ObjString *name);
 static InterpreterResult vm_process_set_global(const ObjString *name);
 static InterpreterResult vm_process_get_property(const ObjString *name);
 static InterpreterResult vm_process_set_property(const ObjString *name);
-static void vm_process_return();
+static void vm_define_method(const ObjString *name);
+
+static InterpreterResult bind_method(const ObjClass *pcls, const ObjString *name);
 
 static ObjUpvalue *capture_upvalue(Value *local);
 
@@ -464,6 +466,13 @@ static InterpreterResult vm_run() {
         }
         break;
 
+      case OP_METHOD:
+        vm_define_method(READ_STRING());
+        break;
+      case OP_METHOD_LONG:
+        vm_define_method(READ_STRING_LONG());
+        break;
+
       case OP_RETURN: {
         Value result = vm_stack_pop();
 
@@ -498,6 +507,13 @@ static InterpreterResult vm_run() {
 #undef OFFSET
 }
 
+static void vm_define_method(const ObjString *name) {
+  Value method = *vm_stack_top();
+  ObjClass *pcls = AS_CLASS(*vm_stack_peek(1));
+  table_set(&pcls->methods, name, method);
+  vm_stack_pop();
+}
+
 static InterpreterResult vm_process_get_property(const ObjString* name) {
   if (!IS_INSTANCE(*vm_stack_top())) {
     runtime_error("Only instances have properties.");
@@ -513,8 +529,21 @@ static InterpreterResult vm_process_get_property(const ObjString* name) {
     return INTERPRET_OK;
   }
 
-  runtime_error("Undefined property '%s'.", name->chars);
-  return INTERPRETER_RUNTUME_ERROR;
+  return bind_method(pinstance->cls, name);
+}
+
+static InterpreterResult bind_method(const ObjClass *pcls, const ObjString *name) {
+  Value method;
+  if (!table_get(&pcls->methods, name, &method)) {
+    runtime_error("Undefined property '%s'.", name->chars);
+    return INTERPRETER_RUNTUME_ERROR;
+  }
+
+  ObjBoundMethod *bound 
+    = bound_method_create(*vm_stack_top(), AS_CLOSURE(method));
+  vm_stack_pop();
+  vm_stack_push(OBJ_VAL(bound));
+  return INTERPRET_OK;
 }
 
 static InterpreterResult vm_process_set_property(const ObjString *name) {
@@ -606,6 +635,11 @@ static bool vm_call_value(Value callee, i32 arg_count) {
     Vm *vm = vm_instance();
 
     switch (OBJ_KIND(callee)) {
+      case OBJ_BOUND_METHOD: {
+        ObjBoundMethod *bound = AS_BOUND_METHOD(callee);
+        return vm_call(bound->method, arg_count);
+      }
+
       case OBJ_CLASS: {
         ObjClass *pcls = AS_CLASS(callee);
         vm->stack_top[-arg_count - 1] = OBJ_VAL(instance_create(pcls));

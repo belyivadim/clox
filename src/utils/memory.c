@@ -75,7 +75,14 @@ static void object_free(Obj *pobj) {
 
 
   switch (pobj->kind) {
+    case OBJ_BOUND_METHOD: {
+      FREE(ObjBoundMethod, pobj);
+      break;
+    }
+
     case OBJ_CLASS: {
+      ObjClass *pcls = (ObjClass*)pobj;
+      table_free(&pcls->methods);
       FREE(ObjClass, pobj);
       break;
     }
@@ -216,9 +223,17 @@ static void blacken_object(Obj *pobj) {
 #endif // !DEBUG_LOG_GC
 
   switch (pobj->kind) {
+    case OBJ_BOUND_METHOD: {
+      ObjBoundMethod *bound = (ObjBoundMethod*)pobj;
+      mark_value(bound->receiver);
+      mark_object((Obj*)bound->method);
+      break;
+    }
+
     case OBJ_CLASS: {
       ObjClass *pcls = (ObjClass*)pobj;
       mark_object((Obj*)pcls->name);
+      mark_table(&pcls->methods);
       break;
     }
 

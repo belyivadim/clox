@@ -249,6 +249,17 @@ typedef enum {
   /// @size = 4 bytes
   OP_CLASS_LONG,
 
+  /// Takes 1 byte operand that is index in current chunk's 
+  ///   constants array to the name of the method
+  ///
+  /// @Interpreting: reads the name of the method
+  ///   and binds this name to the closure on top of the stack
+  /// @size = 2 bytes
+  OP_METHOD,
+
+  /// @size = 4 bytes
+  OP_METHOD_LONG,
+
   /// Bare opcode, takes no operands
   /// @size - 1 byte
   OP_RETURN, 

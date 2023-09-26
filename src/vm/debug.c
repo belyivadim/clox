@@ -146,6 +146,11 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
     case OP_SET_PROPERTY_LONG:
       return constant_long_instruction("OP_SET_PROPERTY_LONG", chunk, offset);
 
+    case OP_METHOD:
+      return constant_instruction("OP_METHOD", chunk, offset);
+    case OP_METHOD_LONG:
+      return constant_long_instruction("OP_METHOD_LONG", chunk, offset);
+
     default:
       printf(DISASSEMBLE_COLOR "Unknown opcode %d\n" COLOR_FG_RESET, instruction);
       return offset + 1;

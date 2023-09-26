@@ -291,6 +291,8 @@ static void fun_decl_handler();
 static void return_statement_handler();
 static void class_decl_handler();
 
+static void method();
+
 /// Compiles the function
 ///
 /// @param fun_kind: kind of the function to complie
@@ -559,14 +561,30 @@ static void var_decl_handler() {
 
 static void class_decl_handler() {
   consume(TOK_IDENTIFIER, "Expect class name.");
+  Token class_name = parser.previous;
   i32 name_constant = identifier_constant(&parser.previous);
   declare_variable();
 
   emit_opcode_with_param(OP_CLASS, name_constant);
   define_variable(name_constant);
 
+  named_variable(&class_name, false); // push class onto the stack
   consume(TOK_LEFT_BRACE, "Expect '{' before class body");
+  while (!check(TOK_RIGHT_BRACE) && !check(TOK_EOF)) {
+    method();
+  }
   consume(TOK_RIGHT_BRACE, "Expect '}' after class body");
+  emit_byte(OP_POP); // pop class from the stack
+}
+
+static void method() {
+  consume(TOK_IDENTIFIER, "Expect method name.");
+  i32 constant = identifier_constant(&parser.previous);
+
+  FunKind kind = FUN_KIND_FUNCTION;
+  function(kind);
+
+  emit_opcode_with_param(OP_METHOD, constant);
 }
 
 static void if_statement_handler() {

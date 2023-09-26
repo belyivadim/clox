@@ -156,6 +156,7 @@ ObjUpvalue *upvalue_create(Value *pslot) {
 ObjClass *class_create(const ObjString *name) {
   ObjClass *pcls = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
   pcls->name = name;
+  table_init(&pcls->methods);
   return pcls;
 }
 
@@ -166,8 +167,19 @@ ObjInstance *instance_create(ObjClass *pcls) {
   return pinstance;
 }
 
+ObjBoundMethod *bound_method_create(Value receiver, ObjClosure *method) {
+  ObjBoundMethod *bound = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
+  bound->receiver = receiver;
+  bound->method = method;
+  return bound;
+}
+
 void object_print(Value value) {
   switch (OBJ_KIND(value)) {
+    case OBJ_BOUND_METHOD:
+      function_print(AS_BOUND_METHOD(value)->method->pfun);
+      break;
+
     case OBJ_CLASS: {
       printf("<class %s>", AS_CLASS(value)->name->chars);
       break;
@@ -207,6 +219,7 @@ void object_print(Value value) {
 
 const char *object_kind_to_string(ObjKind kind) {
   switch (kind) {
+    case OBJ_BOUND_METHOD: return "OBJ_BOUND_METHOD";
     case OBJ_CLASS: return "OBJ_CLASS";
     case OBJ_CLOSURE: return "OBJ_CLOSURE";
     case OBJ_FUNCTION: return "OBJ_FUNCTION";

@@ -10,27 +10,30 @@
 #define OBJ_KIND(v)       (AS_OBJ(v)->kind)
 
 /// Object's kind identifiers
-#define IS_CLASS(v)       is_obj_kind(v, OBJ_CLASS)
-#define IS_CLOSURE(v)     is_obj_kind(v, OBJ_CLOSURE)
-#define IS_FUNCTION(v)    is_obj_kind(v, OBJ_FUNCTION)
-#define IS_INSTANCE(v)    is_obj_kind(v, OBJ_INSTANCE)
-#define IS_NATIVE(v)      is_obj_kind(v, OBJ_NATIVE)
-#define IS_STRING(v)      is_obj_kind(v, OBJ_STRING)
+#define IS_BOUND_METHOD(v)  is_obj_kind(v, OBJ_BOUND_METHOD)
+#define IS_CLASS(v)         is_obj_kind(v, OBJ_CLASS)
+#define IS_CLOSURE(v)       is_obj_kind(v, OBJ_CLOSURE)
+#define IS_FUNCTION(v)      is_obj_kind(v, OBJ_FUNCTION)
+#define IS_INSTANCE(v)      is_obj_kind(v, OBJ_INSTANCE)
+#define IS_NATIVE(v)        is_obj_kind(v, OBJ_NATIVE)
+#define IS_STRING(v)        is_obj_kind(v, OBJ_STRING)
 
 /// Object's accessors
-#define AS_CLASS(v)       ((ObjClass*)AS_OBJ(v))
-#define AS_CLOSURE(v)     ((ObjClosure*)AS_OBJ(v))
-#define AS_FUNCTION(v)    ((ObjFunction*)AS_OBJ(v))
-#define AS_INSTANCE(v)    ((ObjInstance*)AS_OBJ(v))
-#define AS_NATIVE(v)      (((ObjNative*)AS_OBJ(v))->pfun)
-#define AS_NATIVE_OBJ(v)  ((ObjNative*)AS_OBJ(v))
-#define AS_STRING(v)      ((ObjString*)AS_OBJ(v))
-#define AS_CSTRING(v)     (((ObjString*)AS_OBJ(v))->chars)
+#define AS_BOUND_METHOD(v)  ((ObjBoundMethod*)AS_OBJ(v))
+#define AS_CLASS(v)         ((ObjClass*)AS_OBJ(v))
+#define AS_CLOSURE(v)       ((ObjClosure*)AS_OBJ(v))
+#define AS_FUNCTION(v)      ((ObjFunction*)AS_OBJ(v))
+#define AS_INSTANCE(v)      ((ObjInstance*)AS_OBJ(v))
+#define AS_NATIVE(v)        (((ObjNative*)AS_OBJ(v))->pfun)
+#define AS_NATIVE_OBJ(v)    ((ObjNative*)AS_OBJ(v))
+#define AS_STRING(v)        ((ObjString*)AS_OBJ(v))
+#define AS_CSTRING(v)       (((ObjString*)AS_OBJ(v))->chars)
 
 
 
 /// Represents all the possible tags of object types
 typedef enum {
+  OBJ_BOUND_METHOD,
   OBJ_CLASS,
   OBJ_CLOSURE,
   OBJ_FUNCTION,
@@ -141,6 +144,9 @@ typedef struct {
 
   /// Name of the class
   const ObjString *name;
+
+  /// Methods of the class
+  Table methods;
 } ObjClass;
 
 /// Represents a clox instance of some class
@@ -154,6 +160,18 @@ typedef struct {
   /// Fields of the instance
   Table fields;
 } ObjInstance;
+
+/// Represents a clox bound method to an instance
+typedef struct {
+  /// Object field
+  Obj obj;
+
+  /// The instance method is bound to
+  Value receiver;
+
+  /// Bound method
+  ObjClosure *method;
+} ObjBoundMethod;
 
 
 /// Check is the value is object, 
@@ -225,6 +243,14 @@ ObjClass *class_create(const ObjString *name);
 /// @return ObjInstance*, pointer to the newly allocated ObjInstance,
 ///   passes ownership to the caller
 ObjInstance *instance_create(ObjClass *pcls);
+
+/// Creates new bound method object
+///
+/// @param receiver: instance to bound method to 
+/// @param method: pointer to the method's closure to be bound
+/// @return ObjBoundMethod*, pointer to the newly allocated ObjBoundMethod,
+///   passes ownership to the caller
+ObjBoundMethod *bound_method_create(Value receiver, ObjClosure *method);
 
 /// Prints the value param as an object
 ///
