@@ -78,6 +78,8 @@ typedef struct {
 
 typedef enum {
   FUN_KIND_FUNCTION,
+  FUN_KIND_INITIALIZER,
+  FUN_KIND_METHOD,
   FUN_KIND_SCRIPT
 } FunKind;
 
@@ -105,9 +107,17 @@ typedef struct Compiler {
   Upvalue upvalues[U8_COUNT];
 } Compiler;
 
+typedef struct ClassCompiler {
+  struct ClassCompiler *penclosing;
+  Token name;
+} ClassCompiler;
+
 
 /// Parser singleton
 Parser parser;
+
+/// pointer to the current innermost class being compiled
+ClassCompiler *current_class = NULL;
 
 /// pointer to the instance of the currently active compiler
 Compiler *current_compiler = NULL;
@@ -142,8 +152,13 @@ static void compiler_init(Compiler *compiler, FunKind fun_kind) {
   Local *local = current_compiler->locals + current_compiler->local_count++;
   local->depth = 0;
   local->is_captured = false;
-  local->name.start = "";
-  local->name.length = 0;
+  if (fun_kind != FUN_KIND_FUNCTION) {
+    local->name.start = "this";
+    local->name.length = 4;
+  } else {
+    local->name.start = "";
+    local->name.length = 0;
+  }
 }
 
 /// Advances the scanner by scanning the next token
@@ -255,6 +270,7 @@ static void call_handler(bool can_assign);
 static void and_handler(bool can_assign);
 static void or_handler(bool can_assign);
 static void dot_handler(bool can_assign);
+static void this_handler(bool can_assign);
 
 /// Parses argument list for call expression
 ///
@@ -464,7 +480,7 @@ ParseRule rules[] = {
   [TOK_PRINT]         = {NULL, NULL, PREC_NONE},
   [TOK_RETURN]        = {NULL, NULL, PREC_NONE},
   [TOK_SUPER]         = {NULL, NULL, PREC_NONE},
-  [TOK_THIS]          = {NULL, NULL, PREC_NONE},
+  [TOK_THIS]          = {this_handler, NULL, PREC_NONE},
   [TOK_TRUE]          = {literal_hanler, NULL, PREC_NONE},
   [TOK_VAR]           = {NULL, NULL, PREC_NONE},
   [TOK_WHILE]         = {NULL, NULL, PREC_NONE},
@@ -568,6 +584,12 @@ static void class_decl_handler() {
   emit_opcode_with_param(OP_CLASS, name_constant);
   define_variable(name_constant);
 
+  ClassCompiler class_compiler;
+
+  class_compiler.name = parser.previous;
+  class_compiler.penclosing = current_class;
+  current_class = &class_compiler;
+
   named_variable(&class_name, false); // push class onto the stack
   consume(TOK_LEFT_BRACE, "Expect '{' before class body");
   while (!check(TOK_RIGHT_BRACE) && !check(TOK_EOF)) {
@@ -575,13 +597,19 @@ static void class_decl_handler() {
   }
   consume(TOK_RIGHT_BRACE, "Expect '}' after class body");
   emit_byte(OP_POP); // pop class from the stack
+
+  current_class = current_class->penclosing;
 }
 
 static void method() {
   consume(TOK_IDENTIFIER, "Expect method name.");
   i32 constant = identifier_constant(&parser.previous);
 
-  FunKind kind = FUN_KIND_FUNCTION;
+  FunKind kind = FUN_KIND_METHOD;
+  if (4 == parser.previous.length
+    && 0 == memcmp(parser.previous.start, "init", 4)) {
+    kind = FUN_KIND_INITIALIZER;
+  }
   function(kind);
 
   emit_opcode_with_param(OP_METHOD, constant);
@@ -724,6 +752,10 @@ static void return_statement_handler() {
   if (match(TOK_SEMICOLON)) {
     emit_return();
   } else {
+    if (FUN_KIND_INITIALIZER == current_compiler->fun_kind) {
+      error("Can't return a value from an initializer.");
+    }
+
     expression();
     consume(TOK_SEMICOLON, "Expect ';' after return value");
     emit_byte(OP_RETURN);
@@ -991,7 +1023,12 @@ static void emit_byte(u8 byte) {
 }
 
 static void emit_return() {
-  emit_byte(OP_NIL);
+  if (FUN_KIND_INITIALIZER == current_compiler->fun_kind) {
+    emit_opcode_with_param(OP_GET_LOCAL, 0);
+  } else {
+    emit_byte(OP_NIL);
+  }
+
   emit_byte(OP_RETURN);
 }
 
@@ -1127,6 +1164,17 @@ static void dot_handler(bool can_assign) {
   } else {
     emit_opcode_with_param(OP_GET_PROPERTY, name);
   }
+}
+
+static void this_handler(bool can_assign) {
+  (void)can_assign;
+
+  if (NULL == current_class) {
+    error("Can't use 'this' outside of a class.");
+    return;
+  }
+
+  variable_handler(false);
 }
 
 static void named_variable(const Token *name, bool can_assign) {

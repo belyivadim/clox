@@ -108,15 +108,19 @@ void vm_init() {
   table_init(&vm->globals);
   table_init(&vm->strings);
 
+  vm->init_string = NULL; // to prevent GC from reading uninitialized value
+  vm->init_string = string_copy("init", 4);
+
   native_define("clock", clock_native, 0);
   native_define("readln", readln_native, 0);
 }
 
 void vm_free() {
-  free_objects();
   Vm* vm = vm_instance();
   table_free(&vm->globals);
   table_free(&vm->strings);
+  vm->init_string = NULL;
+  free_objects();
 }
 
 void vm_stack_push(Value value) {
@@ -637,12 +641,22 @@ static bool vm_call_value(Value callee, i32 arg_count) {
     switch (OBJ_KIND(callee)) {
       case OBJ_BOUND_METHOD: {
         ObjBoundMethod *bound = AS_BOUND_METHOD(callee);
+        vm->stack_top[-arg_count - 1] = bound->receiver; // bound 'this'
         return vm_call(bound->method, arg_count);
       }
 
       case OBJ_CLASS: {
         ObjClass *pcls = AS_CLASS(callee);
         vm->stack_top[-arg_count - 1] = OBJ_VAL(instance_create(pcls));
+        Value initializer;
+
+        if (table_get(&pcls->methods, vm->init_string, &initializer)) {
+          return vm_call(AS_CLOSURE(initializer), arg_count);
+        } else if (0 != arg_count) {
+          runtime_error("Expected 0 arguments, but got %d.", arg_count);
+          return false;
+        }
+
         return true;
       }
 

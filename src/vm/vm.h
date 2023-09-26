@@ -45,6 +45,8 @@ typedef struct {
   /// Hashset of interning strings
   Table strings;
 
+  const ObjString *init_string;
+
   /// Pointer to the head of the sorted LL of open upvalues in VM
   /// VM is owner of this LL
   ObjUpvalue *open_upvalues;
