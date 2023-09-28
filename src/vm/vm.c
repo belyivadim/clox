@@ -75,7 +75,10 @@ static InterpreterResult vm_process_get_global(const ObjString *name);
 static InterpreterResult vm_process_set_global(const ObjString *name);
 static InterpreterResult vm_process_get_property(const ObjString *name);
 static InterpreterResult vm_process_set_property(const ObjString *name);
+static InterpreterResult vm_process_invoke(const ObjString *method, i32 argc, CallFrame **frame);
+
 static void vm_define_method(const ObjString *name);
+
 
 static InterpreterResult bind_method(const ObjClass *pcls, const ObjString *name);
 
@@ -413,6 +416,25 @@ static InterpreterResult vm_run() {
         break;
       }
 
+      case OP_INVOKE: {
+        const ObjString *method = READ_STRING();
+        i32 argc = READ_BYTE();
+        if (INTERPRET_OK != vm_process_invoke(method, argc, &frame)) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        break;
+      }
+
+      case OP_INVOKE_LONG: {
+        const ObjString *method = READ_STRING_LONG();
+        SKIP_BYTES(3);
+        i32 argc = READ_BYTE();
+        if (INTERPRET_OK != vm_process_invoke(method, argc, &frame)) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        break;
+      }
+
       case OP_CLOSURE: {
         ObjFunction *pfun = AS_FUNCTION(READ_CONSTANT());
         ObjClosure *pclosure = closure_create(pfun);
@@ -708,6 +730,37 @@ static bool vm_call(ObjClosure *pclosure, i32 arg_count) {
 
   pframe->slots = vm->stack_top - arg_count - 1;
   return true;
+}
+
+static bool vm_invoke_from_class(const ObjClass *cls, const ObjString *name, i32 argc) {
+  Value method;
+  if (!table_get(&cls->methods, name, &method)) {
+    runtime_error("Undefined property '%s'.", name->chars);
+    return false;
+  }
+
+  return vm_call(AS_CLOSURE(method), argc);
+}
+
+static bool vm_invoke(const ObjString *name, i32 argc) {
+  Value receiver = *vm_stack_peek(argc);
+
+  if (!IS_INSTANCE(receiver)) {
+    runtime_error("Only instances have methods.");
+    return false;
+  }
+
+  ObjInstance *instance = AS_INSTANCE(receiver);
+  return vm_invoke_from_class(instance->cls, name, argc);
+}
+
+static InterpreterResult vm_process_invoke(const ObjString *method, i32 argc, CallFrame **frame) {
+  if (!vm_invoke(method, argc)) {
+    return INTERPRETER_RUNTUME_ERROR;
+  }
+  Vm *vm = vm_instance();
+  *frame = &vm->frames[vm->frame_count - 1];
+  return INTERPRET_OK;
 }
 
 static void native_define(const char *name, NativeFn pfun, i32 arity) {

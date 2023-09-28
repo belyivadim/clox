@@ -8,6 +8,8 @@ static i32 constant_instruction(const char *name, const Chunk *chunk, i32 offset
 static i32 constant_long_instruction(const char *name, const Chunk *chunk, i32 offset);
 static i32 byte_instruction(const char *name, const Chunk *chunk, i32 offset);
 static i32 jump_instruction(const char *name, i32 sign, const Chunk *chunk, i32 offset);
+static i32 invoke_instruction(const char *name, const Chunk* chunk, i32 offset);
+static i32 invoke_long_instruction(const char *name, const Chunk* chunk, i32 offset);
 
 #define DISASSEMBLE_COLOR COLOR_FG_CYAN
 
@@ -109,6 +111,10 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
       return jump_instruction("OP_LOOP", -1, chunk, offset);
     case OP_CALL:
       return byte_instruction("OP_CALL", chunk, offset);
+    case OP_INVOKE:
+      return invoke_instruction("OP_INVOKE", chunk, offset);
+    case OP_INVOKE_LONG:
+      return invoke_long_instruction("OP_INVOKE_LONG", chunk, offset);
     case OP_CLOSURE: {
       ++offset;
       u8 constant = chunk->code[offset++];
@@ -201,3 +207,22 @@ static i32 jump_instruction(const char *name, i32 sign, const Chunk *chunk, i32 
           name, offset, offset + 3 + sign * jump);
   return offset + 3;
 }
+
+static i32 invoke_instruction(const char *name, const Chunk* chunk, i32 offset) {
+  u8 constant = chunk->code[offset + 1];
+  u8 argc = chunk->code[offset + 2];
+  printf(DISASSEMBLE_COLOR "%-16s (%d argc) [%6d] ", name, argc, constant);
+  value_print(chunk->constants.values[constant]);
+  puts(COLOR_FG_RESET);
+  return offset + 3;
+}
+
+static i32 invoke_long_instruction(const char *name, const Chunk* chunk, i32 offset) {
+  i32 constant = chunk_get_constant_long_index(chunk, offset + 1);
+  u8 argc = chunk->code[offset + 4];
+  printf(DISASSEMBLE_COLOR "%-16s (%d argc) [%6d] " COLOR_FG_RESET, name, argc, constant);
+  value_print(chunk->constants.values[constant]);
+  puts(COLOR_FG_RESET);
+  return offset + 5;
+}
+

@@ -221,6 +221,22 @@ typedef enum {
   /// @size = 2 bytes
   OP_CALL,
 
+  /// Takes 2 operands:
+  ///   1) 1 byte operand, index of the property name in the constants table
+  ///   2) 1 byte operand, argc
+  ///
+  /// @Interpreting: reads operands, invokes the property in a similar way to OP_CALL
+  /// @size = 3 bytes
+  OP_INVOKE,
+
+  /// Takes 2 operands:
+  ///   1) 3 byte operand, index of the property name in the constants table
+  ///   2) 1 byte operand, argc
+  ///
+  /// @Interpreting: reads operands, invokes the property in a similar way to OP_CALL
+  /// @size = 5 bytes
+  OP_INVOKE_LONG,
+
   /// Takes 1 byte operand that is index of the compiled function 
   ///   in current chunk's constants array;
   /// And then variable number of pairs of operands,

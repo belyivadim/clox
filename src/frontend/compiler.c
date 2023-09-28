@@ -1161,6 +1161,12 @@ static void dot_handler(bool can_assign) {
   if (can_assign && match(TOK_EQUAL)) {
     expression();
     emit_opcode_with_param(OP_SET_PROPERTY, name);
+  } else if (match(TOK_LEFT_PAREN)) {
+    // immediate call, no need to create bound method
+    // compile call expression and emit OP_INVOKE
+    u8 arg_count = argument_list();
+    emit_opcode_with_param(OP_INVOKE, name);
+    emit_byte(arg_count);
   } else {
     emit_opcode_with_param(OP_GET_PROPERTY, name);
   }
