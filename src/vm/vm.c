@@ -751,6 +751,17 @@ static bool vm_invoke(const ObjString *name, i32 argc) {
   }
 
   ObjInstance *instance = AS_INSTANCE(receiver);
+
+  Vm *vm = vm_instance();
+
+  // field invokation
+  Value value;
+  if (table_get(&instance->fields, name, &value)) {
+    vm->stack_top[-argc - 1] = value;
+    return vm_call_value(value, argc);
+  }
+
+  // method invokation
   return vm_invoke_from_class(instance->cls, name, argc);
 }
 
