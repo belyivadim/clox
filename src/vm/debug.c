@@ -157,6 +157,20 @@ i32 chunk_disassemble_instruction(Chunk *chunk, i32 offset) {
     case OP_METHOD_LONG:
       return constant_long_instruction("OP_METHOD_LONG", chunk, offset);
 
+    case OP_INHERIT:
+      return simple_instruction("OP_INHERIT", offset);
+
+    case OP_GET_SUPER:
+      return constant_instruction("OP_GET_SUPER", chunk, offset);
+    case OP_GET_SUPER_LONG:
+      return constant_long_instruction("OP_GET_SUPER_LONG", chunk, offset);
+
+    case OP_SUPER_INVOKE:
+      return invoke_instruction("OP_SUPER_INVOKE", chunk, offset);
+    case OP_SUPER_INVOKE_LONG:
+      return invoke_long_instruction("OP_SUPER_INVOKE_LONG", chunk, offset);
+
+
     default:
       printf(DISASSEMBLE_COLOR "Unknown opcode %d\n" COLOR_FG_RESET, instruction);
       return offset + 1;

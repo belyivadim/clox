@@ -276,6 +276,31 @@ typedef enum {
   /// @size = 4 bytes
   OP_METHOD_LONG,
 
+  /// Takes no operands, bare opcode
+  ///
+  /// @Interpreting:
+  /// @size = 1 byte
+  OP_INHERIT,
+
+
+  /// Takes 1 byte operand that is index in current chunk converts array
+  ///   to the name of the method of super class
+  ///
+  /// @Interpreting:
+  /// @size = 2 bytes
+  OP_GET_SUPER,
+
+  /// @size = 4 bytes
+  OP_GET_SUPER_LONG,
+
+  /// Similar behaviour to OP_INVOKE
+  ///
+  /// @size = 3 bytes
+  OP_SUPER_INVOKE,
+
+  /// @size = 5 bytes
+  OP_SUPER_INVOKE_LONG,
+
   /// Bare opcode, takes no operands
   /// @size - 1 byte
   OP_RETURN, 

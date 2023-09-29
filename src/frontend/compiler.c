@@ -108,8 +108,14 @@ typedef struct Compiler {
 } Compiler;
 
 typedef struct ClassCompiler {
+  /// Pointer to enclosing compiler
   struct ClassCompiler *penclosing;
+
+  /// Class name
   Token name;
+
+  /// Flag is set if class is derived
+  bool has_super_class;
 } ClassCompiler;
 
 
@@ -271,6 +277,7 @@ static void and_handler(bool can_assign);
 static void or_handler(bool can_assign);
 static void dot_handler(bool can_assign);
 static void this_handler(bool can_assign);
+static void super_handler(bool can_assign);
 
 /// Parses argument list for call expression
 ///
@@ -308,6 +315,15 @@ static void return_statement_handler();
 static void class_decl_handler();
 
 static void method();
+
+
+/// Creates token with .start points to the text param
+/// and .length equal to length of the string pointed by text param
+///
+/// Note: does not initialize .kind, and .line fields
+///
+/// @return Token, syntheticly create token
+static Token synthetic_token(const char *text);
 
 /// Compiles the function
 ///
@@ -372,7 +388,8 @@ static i32 identifier_constant(const Token *name);
 /// @return void
 static void emit_opcode_with_param(OpCode opcode, i32 param);
 
-/// Defines global variable if current scope is global, otherwise does nothing
+/// Marks variable as initialized if it is local variable.
+/// Emmits OP_DEFINE_GLOBAL with global operand if it is global variable
 ///
 /// @param global: index of the global variable in the currently compiled chunk's
 ///   constants array
@@ -479,7 +496,7 @@ ParseRule rules[] = {
   [TOK_OR]            = {NULL, or_handler, PREC_OR},
   [TOK_PRINT]         = {NULL, NULL, PREC_NONE},
   [TOK_RETURN]        = {NULL, NULL, PREC_NONE},
-  [TOK_SUPER]         = {NULL, NULL, PREC_NONE},
+  [TOK_SUPER]         = {super_handler, NULL, PREC_NONE},
   [TOK_THIS]          = {this_handler, NULL, PREC_NONE},
   [TOK_TRUE]          = {literal_hanler, NULL, PREC_NONE},
   [TOK_VAR]           = {NULL, NULL, PREC_NONE},
@@ -587,8 +604,28 @@ static void class_decl_handler() {
   ClassCompiler class_compiler;
 
   class_compiler.name = parser.previous;
+  class_compiler.has_super_class = false;
   class_compiler.penclosing = current_class;
   current_class = &class_compiler;
+
+  if (match(TOK_LESS)) {
+    consume(TOK_IDENTIFIER, "Expect supreclass name.");
+    variable_handler(false);
+
+    if (identifiers_equal(&class_name, &parser.previous)) {
+      error("A class can't inherit from itself.");
+    }
+
+    // super keyword
+    begin_scope(); // need new scope, so other class decls "super" would not collide
+    Token super_ = synthetic_token("super");
+    add_local(&super_);
+    define_variable(0);
+
+    named_variable(&class_name, false); // push class onto the stack
+    emit_byte(OP_INHERIT);
+    class_compiler.has_super_class = true;
+  }
 
   named_variable(&class_name, false); // push class onto the stack
   consume(TOK_LEFT_BRACE, "Expect '{' before class body");
@@ -598,7 +635,19 @@ static void class_decl_handler() {
   consume(TOK_RIGHT_BRACE, "Expect '}' after class body");
   emit_byte(OP_POP); // pop class from the stack
 
+  // closing scope for "super" keyword
+  if (class_compiler.has_super_class) {
+    end_scope();
+  }
+
   current_class = current_class->penclosing;
+}
+
+static Token synthetic_token(const char *text) {
+  return (Token){
+    .start = text,
+    .length = (i32)strlen(text)
+  };
 }
 
 static void method() {
@@ -1181,6 +1230,33 @@ static void this_handler(bool can_assign) {
   }
 
   variable_handler(false);
+}
+
+static void super_handler(bool can_assign) {
+  (void)can_assign;
+  if (NULL == current_class) {
+    error("Can't use 'super' outside of a class.");
+  } else if (!current_class->has_super_class) {
+    error("Can't user 'super' in a class with no superclass");
+  }
+
+  consume(TOK_DOT, "Expect '.' after 'super'.");
+  consume(TOK_IDENTIFIER, "Expect superclass method name");
+  i32 name = identifier_constant(&parser.previous);
+
+  Token this_ = synthetic_token("this");
+  named_variable(&this_, false);
+  Token super_ = synthetic_token("super");
+  
+  if (match(TOK_LEFT_PAREN)) {
+    u8 argc = argument_list();
+    named_variable(&super_, false);
+    emit_opcode_with_param(OP_SUPER_INVOKE, name);
+    emit_byte(argc);
+  } else {
+    named_variable(&super_, false);
+    emit_opcode_with_param(OP_GET_SUPER, name);
+  }
 }
 
 static void named_variable(const Token *name, bool can_assign) {

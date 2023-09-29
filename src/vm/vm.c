@@ -76,8 +76,13 @@ static InterpreterResult vm_process_set_global(const ObjString *name);
 static InterpreterResult vm_process_get_property(const ObjString *name);
 static InterpreterResult vm_process_set_property(const ObjString *name);
 static InterpreterResult vm_process_invoke(const ObjString *method, i32 argc, CallFrame **frame);
+static InterpreterResult 
+vm_process_super_invoke(const ObjString *method, i32 argc, CallFrame **frame);
+static InterpreterResult vm_process_get_super(const ObjString *name);
 
 static void vm_define_method(const ObjString *name);
+
+static bool vm_invoke_from_class(const ObjClass *cls, const ObjString *name, i32 argc);
 
 
 static InterpreterResult bind_method(const ObjClass *pcls, const ObjString *name);
@@ -499,6 +504,52 @@ static InterpreterResult vm_run() {
         vm_define_method(READ_STRING_LONG());
         break;
 
+      case OP_INHERIT: {
+        Value superclass = *vm_stack_peek(1);
+        if (!IS_CLASS(superclass)) {
+          runtime_error("Superclass must be a clas.");
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        ObjClass* subclass = AS_CLASS(*vm_stack_top());
+        table_add_all(&subclass->methods, &AS_CLASS(superclass)->methods);
+        vm_stack_pop(); // subclass
+        break;
+      }
+
+      case OP_GET_SUPER: {
+        if (INTERPRET_OK != vm_process_get_super(READ_STRING())) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        break;
+      }
+
+      case OP_GET_SUPER_LONG: {
+        if (INTERPRET_OK != vm_process_get_super(READ_STRING_LONG())) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        SKIP_BYTES(3);
+        break;
+      }
+
+      case OP_SUPER_INVOKE: {
+        const ObjString *method = READ_STRING();
+        i32 argc = READ_BYTE();
+        if (INTERPRET_OK != vm_process_super_invoke(method, argc, &frame)) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        break;
+      }
+
+      case OP_SUPER_INVOKE_LONG: {
+        const ObjString *method = READ_STRING_LONG();
+        SKIP_BYTES(3);
+        i32 argc = READ_BYTE();
+        if (INTERPRET_OK != vm_process_super_invoke(method, argc, &frame)) {
+          return INTERPRETER_RUNTUME_ERROR;
+        }
+        break;
+      }
+
       case OP_RETURN: {
         Value result = vm_stack_pop();
 
@@ -538,6 +589,28 @@ static void vm_define_method(const ObjString *name) {
   ObjClass *pcls = AS_CLASS(*vm_stack_peek(1));
   table_set(&pcls->methods, name, method);
   vm_stack_pop();
+}
+
+static InterpreterResult vm_process_get_super(const ObjString *name) {
+  const ObjClass* super_class = AS_CLASS(vm_stack_pop());
+  if (INTERPRET_OK != bind_method(super_class, name)) {
+    return INTERPRETER_RUNTUME_ERROR;
+  }
+
+  return INTERPRET_OK;
+}
+
+static InterpreterResult 
+vm_process_super_invoke(const ObjString *method, i32 argc, CallFrame **frame) {
+
+  const ObjClass *super_class = AS_CLASS(vm_stack_pop());
+  if (!vm_invoke_from_class(super_class, method, argc)) {
+    return INTERPRETER_RUNTUME_ERROR;
+  }
+
+  Vm *vm = vm_instance();
+  *frame = &vm->frames[vm->frame_count - 1];
+  return INTERPRET_OK;
 }
 
 static InterpreterResult vm_process_get_property(const ObjString* name) {
