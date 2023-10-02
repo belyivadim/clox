@@ -34,22 +34,22 @@ static void adjust_capacity(Table *table, i32 capacity);
 void table_init(Table *table) {
   assert(NULL != table);
   table->count = 0;
-  table->capacity = 0;
+  table->capacity = -1;
   table->tombstones_count = 0;
   table->entries = NULL;
 }
 
 void table_free(Table *table) {
   assert(NULL != table);
-  FREE_ARRAY(Entry, table->entries, table->capacity);
+  FREE_ARRAY(Entry, table->entries, table->capacity + 1);
   table_init(table);
 }
 
 bool table_set(Table* table, const ObjString *key, Value value) {
   assert(NULL != table);
 
-  if (table->capacity * TABLE_MAX_LOAD <= table->count + table->tombstones_count) {
-    i32 capacity = GROW_CAPACITY(table->capacity);
+  if ((table->capacity + 1) * TABLE_MAX_LOAD <= table->count + table->tombstones_count) {
+    i32 capacity = GROW_CAPACITY(table->capacity + 1) - 1;
     adjust_capacity(table, capacity);
   }
 
@@ -99,7 +99,7 @@ const ObjString* table_find_string(const Table *table, const char *chars, u32 le
 
   if (0 == table->count) return NULL;
 
-  u32 index = hash % table->capacity;
+  u32 index = hash & table->capacity;
 
   for (;;) {
     Entry *pentry = table->entries + index;
@@ -113,7 +113,7 @@ const ObjString* table_find_string(const Table *table, const char *chars, u32 le
       return pentry->key;
     }
 
-    index = (index + 1) % table->capacity;
+    index = (index + 1) & table->capacity;
   }
 }
 
@@ -121,7 +121,7 @@ void table_add_all(Table* dest, const Table *src) {
   assert(NULL != dest);
   assert(NULL != src);
 
-  for (i32 i = 0; i < src->capacity; ++i) {
+  for (i32 i = 0; i <= src->capacity; ++i) {
     const Entry *pentry = src->entries + i;
     if (NULL != pentry->key) {
       table_set(dest, pentry->key, pentry->value);
@@ -134,7 +134,7 @@ static Entry *find_entry(Entry* entries, i32 capacity, const ObjString *key) {
   assert(NULL != entries);
   assert(NULL != key);
 
-  u32 index = key->hash % capacity;
+  u32 index = key->hash & capacity;
   Entry *tombstone = NULL;
 
   for (;;) {
@@ -153,21 +153,21 @@ static Entry *find_entry(Entry* entries, i32 capacity, const ObjString *key) {
       return pentry;
     }
 
-    index = (index + 1) % capacity;
+    index = (index + 1) & capacity;
   }
 }
 
 static void adjust_capacity(Table *table, i32 capacity) {
   assert(NULL != table);
 
-  Entry *entries = ALLOCATE(Entry, capacity);
+  Entry *entries = ALLOCATE(Entry, capacity + 1);
 
-  for (i32 i = 0; i < capacity; ++i) {
+  for (i32 i = 0; i <= capacity; ++i) {
     entries[i].key = NULL;
     entries[i].value = NIL_VAL;
   }
   
-  for (i32 i = 0; i < table->capacity; ++i) {
+  for (i32 i = 0; i <= table->capacity; ++i) {
     Entry *pentry = table->entries + i;
     if (NULL == pentry->key) continue;
 
@@ -176,7 +176,7 @@ static void adjust_capacity(Table *table, i32 capacity) {
     dest->value = pentry->value;
   }
 
-  FREE_ARRAY(Entry, table->entries, table->capacity);
+  FREE_ARRAY(Entry, table->entries, table->capacity + 1);
   table->entries = entries;
   table->capacity = capacity;
   table->tombstones_count = 0;
@@ -184,17 +184,15 @@ static void adjust_capacity(Table *table, i32 capacity) {
 
 
 void mark_table(Table* table) {
-  for (i32 i = 0; i < table->capacity; ++i) {
+  for (i32 i = 0; i <= table->capacity; ++i) {
     Entry *e = table->entries + i;
     mark_object((Obj*)e->key);
     mark_value(e->value);
   }
 }
 
-#include <stdio.h>
-#include "../vm/debug.h"
 void table_remove_white(Table *table) {
-  for (i32 i = 0; i < table->capacity; ++i) {
+  for (i32 i = 0; i <= table->capacity; ++i) {
     Entry *e = table->entries + i;
     if (NULL != e->key && !e->key->obj.is_marked) {
       table_delete(table, e->key);

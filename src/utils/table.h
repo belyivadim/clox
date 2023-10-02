@@ -19,6 +19,8 @@ typedef struct {
   i32 count;
 
   /// Capacity of entries array
+  /// Note: actual capacity is capacity + 1
+  ///   for table look-up optimisation
   i32 capacity;
 
   /// Number of tombstones elements in entries array
